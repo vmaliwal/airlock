@@ -61,6 +61,7 @@ All runs:
 
 Probe / classification:
 - `airlock probe <repo-path>`
+- `airlock investigate <repo-path>`
 - `airlock preflight <repo-path>`
 
 Important probe statuses:
@@ -79,6 +80,11 @@ Native git-centric attempt execution:
 - `airlock autofix-run <autofix.json>`
 
 For repos classified as `host_toolchain_blocked_vm_runnable`, both commands route into a disposable VM automatically when a VM backend is available.
+
+Policy note:
+- unknown repo code should not execute on the host by default
+- use `AIRLOCK_ALLOW_HOST_EXEC_EXCEPTION=1` only for an explicit, declared host exception
+- otherwise prefer VM-backed execution even when the host could technically run the repo
 
 Research flows:
 - `airlock research-validate <contract.json>`

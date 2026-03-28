@@ -53,6 +53,7 @@ go test ./...
 
 ```bash
 ./airlock probe /path/to/repo-or-subdir
+./airlock investigate /path/to/repo-or-subdir
 ./airlock preflight /path/to/repo-or-subdir
 ```
 
@@ -60,6 +61,12 @@ Probe now distinguishes between:
 - `ready` — host execution is viable
 - `structurally_blocked` — missing sources/bootstrap makes honest execution impossible
 - `host_toolchain_blocked_vm_runnable` — host execution should not proceed, but VM execution is still viable
+
+Host execution policy:
+- unknown repo code should not execute on the host by default
+- `airlock attempt-run ...` and `airlock autofix-run ...` will route to a VM when possible unless an explicit host exception is declared
+- declare an explicit host exception only with:
+  - `AIRLOCK_ALLOW_HOST_EXEC_EXCEPTION=1`
 
 When a repo falls into `host_toolchain_blocked_vm_runnable`, Airlock will prefer a VM-backed path instead of trying to validate on the host.
 Currently this auto-routing applies to:

@@ -12,7 +12,7 @@ type PreflightDecision struct {
 	SuggestedNextActions []string       `json:"suggestedNextActions,omitempty"`
 }
 
-func PreflightRepo(path string, vmBackend string) (PreflightDecision, error) {
+func PreflightRepo(path string, vmBackend string, allowHostExecution bool) (PreflightDecision, error) {
 	profile, err := DetectRepo(path)
 	if err != nil {
 		return PreflightDecision{}, err
@@ -38,10 +38,24 @@ func PreflightRepo(path string, vmBackend string) (PreflightDecision, error) {
 		decision.SuggestedCommands = []string{"airlock autofix-run <autofix.json>", "airlock attempt-run <attempt.json>", "airlock research-run <research.json>"}
 		decision.SuggestedNextActions = []string{"use VM-backed run", "avoid host validation", "capture resulting artifacts and lessons"}
 	default:
-		decision.Route = "host"
-		decision.Reason = "host execution is viable for bounded local workflows"
-		decision.SuggestedCommands = []string{"airlock attempt-run <attempt.json>", "airlock autofix-run <autofix.json>", fmt.Sprintf("airlock probe %s", path)}
-		decision.SuggestedNextActions = []string{"run bounded attempt/autofix locally", "promote to VM if trust or parity requires it"}
+		if !allowHostExecution {
+			if vmBackend != "" {
+				decision.Route = "vm"
+				decision.Reason = "host execution is blocked by policy for unknown repo code; route execution into a disposable VM unless an explicit host exception is declared"
+				decision.SuggestedVMBackend = vmBackend
+				decision.SuggestedCommands = []string{"airlock investigate <repo-path>", "airlock autofix-run <autofix.json>", "airlock attempt-run <attempt.json>"}
+				decision.SuggestedNextActions = []string{"use VM-backed execution", fmt.Sprintf("declare %s=1 only for an explicit host exception", HostExecutionExceptionEnv)}
+			} else {
+				decision.Route = "stop"
+				decision.Reason = "host execution is blocked by policy for unknown repo code and no VM backend is ready"
+				decision.SuggestedNextActions = []string{"run 'airlock check'", "configure a VM backend", fmt.Sprintf("declare %s=1 only for an explicit host exception", HostExecutionExceptionEnv)}
+			}
+		} else {
+			decision.Route = "host"
+			decision.Reason = "host execution exception was explicitly declared"
+			decision.SuggestedCommands = []string{"airlock attempt-run <attempt.json>", "airlock autofix-run <autofix.json>", fmt.Sprintf("airlock probe %s", path)}
+			decision.SuggestedNextActions = []string{"run bounded attempt/autofix locally", "prefer VM execution when trust or parity is uncertain"}
+		}
 	}
 	return decision, nil
 }

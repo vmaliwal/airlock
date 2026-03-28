@@ -258,6 +258,7 @@ Desired next state:
 ## Priority View
 
 Highest-priority gaps for the next phase:
+0. codify and enforce: no execution of unknown repo code on host unless an explicit exception is declared
 1. stronger repair planning
 2. better self-improvement from lessons
 3. unified engine behavior across modes
@@ -271,7 +272,22 @@ Highest-priority gaps for the next phase:
 
 ## Execution Plan
 
-This section translates the roadmap into concrete workstreams. The immediate focus is items 1 through 7 plus the new no-handcrafted-contract policy.
+This section translates the roadmap into concrete workstreams. The immediate focus is Priority 0 plus items 1 through 7, with the new no-handcrafted-contract policy enforced throughout.
+
+### Workstream 0 — Host execution policy enforcement
+Addresses:
+- Priority 0
+- Gap 7
+
+Deliverables:
+- explicit host-execution gate in CLI/runtime paths
+- default VM routing for unknown repo execution when a backend is available
+- explicit override path for declared host exceptions
+- preflight output that makes policy decisions visible
+
+Success signals:
+- unknown repo code no longer executes on host silently
+- every host execution is either trusted-by-design or an explicit visible exception
 
 ### Workstream 1 — Planner and strategy synthesis
 Addresses:

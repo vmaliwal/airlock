@@ -26,6 +26,12 @@ func main() {
 			os.Exit(1)
 		}
 		runProbe(os.Args[2])
+	case "investigate":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: airlock investigate <repo-path>")
+			os.Exit(1)
+		}
+		runInvestigate(os.Args[2])
 	case "preflight":
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "usage: airlock preflight <repo-path>")
@@ -93,7 +99,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Println("usage: airlock <check|probe|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
+	fmt.Println("usage: airlock <check|probe|investigate|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
 }
 
 func runCheck() {
@@ -128,12 +134,25 @@ func runProbe(path string) {
 	fmt.Println(string(data))
 }
 
+func runInvestigate(path string) {
+	backend := ""
+	if kind, err := selectAutoVMBackend(); err == nil {
+		backend = string(kind)
+	}
+	report, err := research.InvestigateRepo(path, backend, research.HostExecutionExceptionDeclared())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println(toJSON(report))
+}
+
 func runPreflight(path string) {
 	backend := ""
 	if kind, err := selectAutoVMBackend(); err == nil {
 		backend = string(kind)
 	}
-	decision, err := research.PreflightRepo(path, backend)
+	decision, err := research.PreflightRepo(path, backend, research.HostExecutionExceptionDeclared())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -167,27 +186,35 @@ func runAttempt(path string) {
 		fmt.Println(toJSON(errs))
 		os.Exit(1)
 	}
+	backendKind, backendErr := selectAutoVMBackend()
 	profile, err := research.DetectRepo(cfg.Repo)
 	if err == nil {
 		assessment, err := research.AssessRepo(profile)
-		if err == nil && assessment.RecommendedExecution == "vm" && assessment.VMRunnable {
-			backendKind, berr := selectAutoVMBackend()
-			if berr != nil {
-				fmt.Fprintln(os.Stderr, berr)
+		if err == nil {
+			shouldRouteToVM := assessment.VMRunnable && (assessment.RecommendedExecution == "vm" || !research.HostExecutionExceptionDeclared())
+			if shouldRouteToVM {
+				if backendErr != nil {
+					fmt.Fprintln(os.Stderr, backendErr)
+					fmt.Fprintf(os.Stderr, "host execution blocked by policy; declare %s=1 only for an explicit host exception\n", research.HostExecutionExceptionEnv)
+					os.Exit(1)
+				}
+				compiled, cerr := research.CompileAttemptFileToVMContract(cfg, backendKind)
+				if cerr != nil {
+					fmt.Fprintln(os.Stderr, cerr)
+					os.Exit(1)
+				}
+				summaryPath, rerr := executeBaseContract(compiled)
+				if rerr != nil {
+					fmt.Fprintln(os.Stderr, rerr)
+					os.Exit(1)
+				}
+				fmt.Println(toJSON(map[string]any{"summaryPath": summaryPath, "routedToVM": true, "backend": backendKind, "hostExecutionExceptionDeclared": research.HostExecutionExceptionDeclared()}))
+				return
+			}
+			if !research.HostExecutionExceptionDeclared() {
+				fmt.Fprintf(os.Stderr, "host execution blocked by policy; declare %s=1 only for an explicit host exception\n", research.HostExecutionExceptionEnv)
 				os.Exit(1)
 			}
-			compiled, cerr := research.CompileAttemptFileToVMContract(cfg, backendKind)
-			if cerr != nil {
-				fmt.Fprintln(os.Stderr, cerr)
-				os.Exit(1)
-			}
-			summaryPath, rerr := executeBaseContract(compiled)
-			if rerr != nil {
-				fmt.Fprintln(os.Stderr, rerr)
-				os.Exit(1)
-			}
-			fmt.Println(toJSON(map[string]any{"summaryPath": summaryPath, "routedToVM": true, "backend": backendKind}))
-			return
 		}
 	}
 	outcome, err := research.RunAttemptFile(cfg)
@@ -211,27 +238,35 @@ func runAutofix(path string) {
 		fmt.Println(toJSON(errs))
 		os.Exit(1)
 	}
+	backendKind, backendErr := selectAutoVMBackend()
 	profile, err := research.DetectRepo(cfg.Repo)
 	if err == nil {
 		assessment, err := research.AssessRepo(profile)
-		if err == nil && assessment.RecommendedExecution == "vm" && assessment.VMRunnable {
-			backendKind, berr := selectAutoVMBackend()
-			if berr != nil {
-				fmt.Fprintln(os.Stderr, berr)
+		if err == nil {
+			shouldRouteToVM := assessment.VMRunnable && (assessment.RecommendedExecution == "vm" || !research.HostExecutionExceptionDeclared())
+			if shouldRouteToVM {
+				if backendErr != nil {
+					fmt.Fprintln(os.Stderr, backendErr)
+					fmt.Fprintf(os.Stderr, "host execution blocked by policy; declare %s=1 only for an explicit host exception\n", research.HostExecutionExceptionEnv)
+					os.Exit(1)
+				}
+				compiled, cerr := research.CompileAutofixPlanToVMContract(cfg, backendKind)
+				if cerr != nil {
+					fmt.Fprintln(os.Stderr, cerr)
+					os.Exit(1)
+				}
+				summaryPath, rerr := executeBaseContract(compiled)
+				if rerr != nil {
+					fmt.Fprintln(os.Stderr, rerr)
+					os.Exit(1)
+				}
+				fmt.Println(toJSON(map[string]any{"summaryPath": summaryPath, "routedToVM": true, "backend": backendKind, "hostExecutionExceptionDeclared": research.HostExecutionExceptionDeclared()}))
+				return
+			}
+			if !research.HostExecutionExceptionDeclared() {
+				fmt.Fprintf(os.Stderr, "host execution blocked by policy; declare %s=1 only for an explicit host exception\n", research.HostExecutionExceptionEnv)
 				os.Exit(1)
 			}
-			compiled, cerr := research.CompileAutofixPlanToVMContract(cfg, backendKind)
-			if cerr != nil {
-				fmt.Fprintln(os.Stderr, cerr)
-				os.Exit(1)
-			}
-			summaryPath, rerr := executeBaseContract(compiled)
-			if rerr != nil {
-				fmt.Fprintln(os.Stderr, rerr)
-				os.Exit(1)
-			}
-			fmt.Println(toJSON(map[string]any{"summaryPath": summaryPath, "routedToVM": true, "backend": backendKind}))
-			return
 		}
 	}
 	summaryPath, err := research.RunAutofixPlan(cfg)
