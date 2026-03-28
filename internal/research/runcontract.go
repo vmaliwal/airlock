@@ -63,19 +63,21 @@ type Phase struct {
 }
 
 type RunContract struct {
-	Airlock      base.Contract  `json:"airlock"`
-	Objective    string         `json:"objective"`
-	Mode         string         `json:"mode"`
-	TargetPath   string         `json:"targetPath,omitempty"`
-	ArtifactsDir string         `json:"artifactsDir,omitempty"`
-	Setup        []SetupStep    `json:"setup,omitempty"`
-	Baseline     *Phase         `json:"baseline,omitempty"`
-	Reproduction Phase          `json:"reproduction"`
-	Patches      []PatchStep    `json:"patches,omitempty"`
-	Validation   ValidationSpec `json:"validation"`
-	Safety       SafetyBudget   `json:"safety,omitempty"`
-	Stuck        StuckPolicy    `json:"stuck,omitempty"`
-	Campaign     *CampaignSpec  `json:"campaign,omitempty"`
+	Airlock                base.Contract  `json:"airlock"`
+	Objective              string         `json:"objective"`
+	Mode                   string         `json:"mode"`
+	TargetPath             string         `json:"targetPath,omitempty"`
+	ArtifactsDir           string         `json:"artifactsDir,omitempty"`
+	Plan                   *ConcretePlan  `json:"plan,omitempty"`
+	HostExecutionException bool           `json:"hostExecutionException,omitempty"`
+	Setup                  []SetupStep    `json:"setup,omitempty"`
+	Baseline               *Phase         `json:"baseline,omitempty"`
+	Reproduction           Phase          `json:"reproduction"`
+	Patches                []PatchStep    `json:"patches,omitempty"`
+	Validation             ValidationSpec `json:"validation"`
+	Safety                 SafetyBudget   `json:"safety,omitempty"`
+	Stuck                  StuckPolicy    `json:"stuck,omitempty"`
+	Campaign               *CampaignSpec  `json:"campaign,omitempty"`
 }
 
 func LoadRunContract(path string) (RunContract, error) {

@@ -63,6 +63,13 @@ go test ./...
 ./airlock preflight /path/to/repo-or-subdir
 ```
 
+`plan-input.json` can include:
+- `repoPath`
+- `issueUrl`
+- `failingCommand`
+- `failureText`
+- `notes`
+
 Probe now distinguishes between:
 - `ready` — repo is runnable with no immediate structural warning
 - `structurally_blocked` — missing sources/bootstrap makes honest execution impossible

@@ -21,6 +21,13 @@ func ExecuteRunContract(c RunContract, repoRoot, artifactsDir string) error {
 	if err := os.MkdirAll(artifactsDir, 0o755); err != nil {
 		return err
 	}
+	_ = writeJSON(filepath.Join(artifactsDir, "execution-policy.json"), map[string]any{
+		"hostExecutionException": c.HostExecutionException,
+		"planPresent":            c.Plan != nil,
+		"targetPath":             c.TargetPath,
+		"repoRoot":               repoRoot,
+		"effectiveRepo":          repo,
+	})
 	if err := GitEnsureIdentity(repo); err != nil {
 		return err
 	}

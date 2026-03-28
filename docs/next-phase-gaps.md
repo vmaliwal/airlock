@@ -475,6 +475,9 @@ Use this section as an ongoing journal of gap discoveries and refinements.
 - Planning now uses failure-text-derived fingerprint hints plus prior lessons to rank mutation families more intelligently.
 - Expanded classification with `bootstrap_needed_vm_preferred`, `partial_runnable_scope`, and `env_config_blocked`.
 - Added warning-level taxonomy for `service_dependent`, `integration_blocked`, and `flaky_candidate`.
+- Added a concrete plan structure for research planning and compilation.
+- Compiled research contracts now carry plan data when available.
+- Run artifacts now include `execution-policy.json` so host-exception/provenance is inspectable after execution.
 - Fixed a real probe issue: repo root detection now prefers the git root over the nearest nested manifest so subdir/package scope is preserved honestly.
 - Added host-toolchain-blocked-but-VM-runnable classification.
 - Added VM auto-routing for `attempt-run` and `autofix-run`.

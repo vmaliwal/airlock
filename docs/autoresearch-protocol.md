@@ -106,6 +106,8 @@ Campaign flows:
 
 Execution note:
 - campaign execution now uses the same compiled-contract execution helper path as other backend-driven flows
+- compiled research contracts now carry a concrete plan object when available
+- run artifacts now include `execution-policy.json` so host-exception/provenance is visible after execution
 - this reduces backend/prereq drift between campaign mode and direct contract execution
 
 Autofix and planning learning:

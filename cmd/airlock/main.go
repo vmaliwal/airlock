@@ -354,6 +354,7 @@ func runResearchValidate(path string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	rc.HostExecutionException = research.HostExecutionExceptionDeclared()
 	if errs := research.ValidateRunContract(rc); len(errs) > 0 {
 		data, _ := json.MarshalIndent(errs, "", "  ")
 		fmt.Println(string(data))
@@ -374,6 +375,7 @@ func runResearchRun(path string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	rc.HostExecutionException = research.HostExecutionExceptionDeclared()
 	if errs := research.ValidateRunContract(rc); len(errs) > 0 {
 		data, _ := json.MarshalIndent(errs, "", "  ")
 		fmt.Println(string(data))
@@ -449,6 +451,7 @@ func mustLoadCampaignContract(path string) research.RunContract {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	rc.HostExecutionException = research.HostExecutionExceptionDeclared()
 	if errs := research.ValidateRunContract(rc); len(errs) > 0 {
 		data, _ := json.MarshalIndent(errs, "", "  ")
 		fmt.Println(string(data))

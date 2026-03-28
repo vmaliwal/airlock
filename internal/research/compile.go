@@ -12,6 +12,13 @@ const researchRunnerTemplate = `/tmp/airlock-researchguest __CONTRACT_B64__`
 
 func CompileRunContract(c RunContract) (base.Contract, error) {
 	rc := c
+	if rc.Plan == nil {
+		plan, err := PlanFromInput(PlanInput{RepoPath: rc.TargetPathOrRepoCloneURLHint(), Notes: rc.Objective}, string(rc.Airlock.Backend.Kind), rc.HostExecutionException)
+		if err == nil {
+			concrete := BuildConcretePlan(plan)
+			rc.Plan = &concrete
+		}
+	}
 	if subdir := rc.Airlock.Repo.Subdir; subdir != "" {
 		rc.Safety.AllowedPaths = prefixPaths(subdir, rc.Safety.AllowedPaths)
 		rc.Safety.ForbiddenPaths = prefixPaths(subdir, rc.Safety.ForbiddenPaths)
