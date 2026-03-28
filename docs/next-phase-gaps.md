@@ -339,3 +339,8 @@ Use this section as an ongoing journal of gap discoveries and refinements.
 - Validated real VM-routed fixes on `litefunctions/portal`.
 - Confirmed one important gap pattern for nested-module repos: safety allowlists must be interpreted relative to git root in diff accounting.
 - Confirmed that route quality is now improving, but repair planning quality remains the larger strategic gap.
+- Probed new OSS targets:
+  - `langchain-ai/langchain` root exposed a real monorepo detection gap: Airlock reported `repoType: unknown` at repo root because manifests live in nested package dirs.
+  - `langchain-ai/langchain/libs/core` showed that subdir probing works fine once pointed at a concrete package.
+  - `cli/cli` and `charmbracelet/gum` both validated the usefulness of the `host_toolchain_blocked_vm_runnable` route.
+- New nuance discovered: host toolchain classification is policy-sensitive. Raw host `go test ./...` can succeed for some repos via Go's auto-toolchain download, while Airlock intentionally treats host execution as blocked under local-toolchain-only policy. This likely needs clearer policy documentation or an explicit configurable stance.
