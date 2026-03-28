@@ -1,0 +1,38 @@
+{
+  "backend": {
+    "kind": "firecracker",
+    "firecrackerHost": {
+      "mode": "ssh",
+      "host": "runner.example.com",
+      "user": "airlock",
+      "remoteWorkDir": "/var/tmp/airlock"
+    }
+  },
+  "sandbox": {
+    "namePrefix": "beats-httpjson-precision",
+    "artifactsDir": "/tmp/airlock-example-artifacts",
+    "cpu": 2,
+    "memoryGiB": 4,
+    "diskGiB": 10,
+    "ttlMinutes": 30
+  },
+  "repo": {
+    "cloneUrl": "https://github.com/elastic/beats.git",
+    "ref": "main"
+  },
+  "security": {
+    "network": "allowlist",
+    "allowHosts": ["github.com", "proxy.golang.org", "sum.golang.org"],
+    "allowedEnv": [],
+    "exportPaths": ["/airlock/artifacts"],
+    "includePatch": true
+  },
+  "steps": [
+    {
+      "name": "repro-httpjson-precision",
+      "run": "go test ./x-pack/filebeat/input/httpjson -run TestGetIdsFromResponses_LargeIntegerPrecision -count=1",
+      "timeoutSeconds": 1200,
+      "allowFailure": true
+    }
+  ]
+}

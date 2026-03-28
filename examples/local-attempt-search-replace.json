@@ -1,0 +1,23 @@
+{
+  "repo": "/tmp/airlock-example-repo",
+  "artifactsDir": "/tmp/airlock-example-attempt-artifacts",
+  "attempt": {
+    "name": "bounded-search-replace",
+    "validation": {
+      "command": "grep -q '^good$' flag.txt",
+      "repeat": 1,
+      "success": { "exit_code": 0, "min_pass_rate": 1.0 }
+    },
+    "safety": {
+      "max_files_changed": 1,
+      "allowed_paths": ["flag.txt"]
+    }
+  },
+  "mutation": {
+    "search_replace": {
+      "path": "flag.txt",
+      "oldText": "bad\n",
+      "newText": "good\n"
+    }
+  }
+}

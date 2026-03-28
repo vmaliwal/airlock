@@ -1,0 +1,21 @@
+{
+  "objective": "Run the three verified elastic/beats issue contracts as one aggregate campaign",
+  "artifactsDir": "/tmp/airlock-beats-three-issue-campaign",
+  "entries": [
+    {
+      "name": "beats-kafka-alias",
+      "contract": "beats-kafka-alias-research.json"
+    },
+    {
+      "name": "beats-kafka-panic",
+      "contract": "beats-kafka-panic-research.json"
+    },
+    {
+      "name": "beats-httpjson-precision",
+      "contract": "beats-httpjson-precision-research.json"
+    }
+  ],
+  "success": {
+    "max_failed": 0
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "objective": "Reproduce and fix the elastic/beats httpjson large integer precision issue in a disposable VM",
+  "mode": "mutate",
+  "airlock": {
+    "backend": { "kind": "lima" },
+    "sandbox": {
+      "namePrefix": "beats-httpjson-precision",
+      "artifactsDir": "/tmp/airlock-beats-httpjson-precision",
+      "cpu": 4,
+      "memoryGiB": 8,
+      "diskGiB": 20,
+      "ttlMinutes": 60
+    },
+    "repo": {
+      "cloneUrl": "https://github.com/elastic/beats.git",
+      "ref": "main"
+    },
+    "security": {
+      "bootstrapNetwork": "allowlist",
+      "bootstrapAllowHosts": ["archive.ubuntu.com", "security.ubuntu.com", "ports.ubuntu.com"],
+      "bootstrapAptPackages": ["git", "ca-certificates", "golang-go"],
+      "network": "allowlist",
+      "allowHosts": ["github.com", "proxy.golang.org", "sum.golang.org"],
+      "allowedEnv": [],
+      "exportPaths": ["/airlock/artifacts"],
+      "includePatch": true
+    },
+    "steps": [
+      { "name": "placeholder", "run": "true" }
+    ]
+  },
+  "setup": [
+    {
+      "name": "add repro test",
+      "command": "python3 - <<'PY'\nfrom pathlib import Path\np = Path('x-pack/filebeat/input/httpjson/bug_precision_repro_test.go')\np.write_text('''package httpjson\\n\\nimport (\\n    \"io\"\\n    \"net/http\"\\n    \"strings\"\\n    \"testing\"\\n)\\n\\nfunc TestGetIdsFromResponses_LargeIntegerPrecision(t *testing.T) {\\n    r := &requester{}\\n    resp := &http.Response{Body: io.NopCloser(strings.NewReader(`[9007199254740993]`))}\\n\\n    ids, err := r.getIdsFromResponses([]*http.Response{resp}, \"$[:]\")\\n    if err != nil {\\n        t.Fatalf(\"unexpected error: %v\", err)\\n    }\\n    if len(ids) != 1 {\\n        t.Fatalf(\"expected exactly one id, got %d (%v)\", len(ids), ids)\\n    }\\n\\n    want := \"9007199254740993\"\\n    if ids[0] != want {\\n        t.Fatalf(\"expected id %q, got %q\", want, ids[0])\\n    }\\n}\\n''')\nPY",
+      "commit_message": "test: add httpjson precision repro"
+    }
+  ],
+  "reproduction": {
+    "command": "go test ./x-pack/filebeat/input/httpjson -run TestGetIdsFromResponses_LargeIntegerPrecision -count=1",
+    "repeat": 1,
+    "success": { "min_failures": 1 }
+  },
+  "patches": [
+    {
+      "name": "preserve integer precision when extracting response ids",
+      "command": "python3 - <<'PY'\nfrom pathlib import Path\np = Path('x-pack/filebeat/input/httpjson/request.go')\ns = p.read_text()\nold_decoder = '''\t\tvar v interface{}\n\t\tif err := json.Unmarshal(b, &v); err != nil {\n\t\t\treturn nil, fmt.Errorf(\"cannot unmarshal data: %w\", textContextError{error: err, body: b})\n\t\t}\n'''\nnew_decoder = '''\t\tvar v interface{}\n\t\tdec := json.NewDecoder(bytes.NewReader(b))\n\t\tdec.UseNumber()\n\t\tif err := dec.Decode(&v); err != nil {\n\t\t\treturn nil, fmt.Errorf(\"cannot unmarshal data: %w\", textContextError{error: err, body: b})\n\t\t}\n'''\nold_switch = '''\t\tcase []interface{}:\n\t\t\tfor _, v := range tresp {\n\t\t\t\tswitch v.(type) {\n\t\t\t\tcase float64, string:\n\t\t\t\t\tids = append(ids, fmt.Sprintf(\"%v\", v))\n\t\t\t\tdefault:\n\t\t\t\t\tr.log.Errorf(\"events must a number or string, but got %T: skipping\", v)\n\t\t\t\t\tcontinue\n\t\t\t\t}\n\t\t\t}\n\t\tcase float64, string:\n\t\t\tids = append(ids, fmt.Sprintf(\"%v\", tresp))\n'''\nnew_switch = '''\t\tcase []interface{}:\n\t\t\tfor _, v := range tresp {\n\t\t\t\tswitch v.(type) {\n\t\t\t\tcase float64, string, json.Number:\n\t\t\t\t\tids = append(ids, fmt.Sprintf(\"%v\", v))\n\t\t\t\tdefault:\n\t\t\t\t\tr.log.Errorf(\"events must a number or string, but got %T: skipping\", v)\n\t\t\t\t\tcontinue\n\t\t\t\t}\n\t\t\t}\n\t\tcase float64, string, json.Number:\n\t\t\tids = append(ids, fmt.Sprintf(\"%v\", tresp))\n'''\nif old_decoder not in s:\n    raise SystemExit('decoder target text not found')\nif old_switch not in s:\n    raise SystemExit('switch target text not found')\ns = s.replace(old_decoder, new_decoder).replace(old_switch, new_switch)\np.write_text(s)\nPY"
+    }
+  ],
+  "validation": {
+    "target_command": "go test ./x-pack/filebeat/input/httpjson -run TestGetIdsFromResponses_LargeIntegerPrecision -count=1",
+    "repeat": 1,
+    "success": { "exit_code": 0, "min_pass_rate": 1.0, "max_failures": 0 },
+    "neighbor_command": "go test ./x-pack/filebeat/input/httpjson -count=1",
+    "neighbor_success": { "exit_code": 0 }
+  },
+  "safety": {
+    "max_files_changed": 2,
+    "max_loc_changed": 40,
+    "allowed_paths": ["x-pack/filebeat/input/httpjson/*"]
+  },
+  "stuck": {
+    "max_same_failure_fingerprint": 2,
+    "max_attempts_without_improvement": 2
+  }
+}

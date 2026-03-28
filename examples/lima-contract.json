@@ -1,0 +1,30 @@
+{
+  "backend": { "kind": "lima" },
+  "sandbox": {
+    "namePrefix": "beats-kafka-alias",
+    "artifactsDir": "/tmp/airlock-example-artifacts",
+    "cpu": 4,
+    "memoryGiB": 8,
+    "diskGiB": 20,
+    "ttlMinutes": 60
+  },
+  "repo": {
+    "cloneUrl": "https://github.com/elastic/beats.git",
+    "ref": "main"
+  },
+  "security": {
+    "network": "allowlist",
+    "allowHosts": ["github.com", "proxy.golang.org", "sum.golang.org"],
+    "allowedEnv": [],
+    "exportPaths": ["/airlock/artifacts"],
+    "includePatch": true
+  },
+  "steps": [
+    {
+      "name": "repro-kafka-alias",
+      "run": "go test ./libbeat/common/kafka -run TestRepro_MajorVersionAliasUsesLatestMinor -count=1",
+      "timeoutSeconds": 1200,
+      "allowFailure": true
+    }
+  ]
+}

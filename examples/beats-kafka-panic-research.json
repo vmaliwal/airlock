@@ -1,0 +1,66 @@
+{
+  "objective": "Reproduce and fix the elastic/beats kafka input Test() panic on client initialization failure in a disposable VM",
+  "mode": "mutate",
+  "airlock": {
+    "backend": { "kind": "lima" },
+    "sandbox": {
+      "namePrefix": "beats-kafka-panic",
+      "artifactsDir": "/tmp/airlock-beats-kafka-panic",
+      "cpu": 4,
+      "memoryGiB": 8,
+      "diskGiB": 20,
+      "ttlMinutes": 60
+    },
+    "repo": {
+      "cloneUrl": "https://github.com/elastic/beats.git",
+      "ref": "main"
+    },
+    "security": {
+      "bootstrapNetwork": "allowlist",
+      "bootstrapAllowHosts": ["archive.ubuntu.com", "security.ubuntu.com", "ports.ubuntu.com"],
+      "bootstrapAptPackages": ["git", "ca-certificates", "golang-go"],
+      "network": "allowlist",
+      "allowHosts": ["github.com", "proxy.golang.org", "sum.golang.org"],
+      "allowedEnv": [],
+      "exportPaths": ["/airlock/artifacts"],
+      "includePatch": true
+    },
+    "steps": [
+      { "name": "placeholder", "run": "true" }
+    ]
+  },
+  "setup": [
+    {
+      "name": "add repro test",
+      "command": "python3 - <<'PY'\nfrom pathlib import Path\np = Path('filebeat/input/kafka/zz_kafka_repro_test.go')\np.write_text('''package kafka\\n\\nimport (\\n    \"testing\"\\n\\n    input \"github.com/elastic/beats/v7/filebeat/input/v2\"\\n    \"github.com/elastic/elastic-agent-libs/logp\"\\n    \"github.com/elastic/sarama\"\\n    \"github.com/stretchr/testify/require\"\\n)\\n\\nfunc TestKafkaInputTestNoPanicOnClientError(t *testing.T) {\\n    k := &kafkaInput{\\n        config: kafkaInputConfig{Hosts: []string{\"127.0.0.1:1\"}, Topics: []string{\"topic-a\"}},\\n        saramaConfig: sarama.NewConfig(),\\n    }\\n\\n    defer func() {\\n        if r := recover(); r != nil {\\n            t.Fatalf(\"Test() panicked instead of returning an error: %v\", r)\\n        }\\n    }()\\n\\n    err := k.Test(input.TestContext{Logger: logp.NewLogger(\"kafka-repro\")})\\n    require.Error(t, err)\\n}\\n''')\nPY",
+      "commit_message": "test: add kafka input panic repro"
+    }
+  ],
+  "reproduction": {
+    "command": "go test ./filebeat/input/kafka -run TestKafkaInputTestNoPanicOnClientError -count=1",
+    "repeat": 1,
+    "success": { "min_failures": 1 }
+  },
+  "patches": [
+    {
+      "name": "return client initialization error instead of panicking",
+      "command": "python3 - <<'PY'\nfrom pathlib import Path\np = Path('filebeat/input/kafka/input.go')\ns = p.read_text()\nold = '''func (input *kafkaInput) Test(ctx input.TestContext) error {\n\tclient, err := sarama.NewClient(input.config.Hosts, input.saramaConfig)\n\tif err != nil {\n\t\tctx.Logger.Error(err)\n\t}\n\ttopics, err := client.Topics()\n'''\nnew = '''func (input *kafkaInput) Test(ctx input.TestContext) error {\n\tclient, err := sarama.NewClient(input.config.Hosts, input.saramaConfig)\n\tif err != nil {\n\t\tctx.Logger.Error(err)\n\t\treturn err\n\t}\n\tdefer client.Close()\n\ttopics, err := client.Topics()\n'''\nif old not in s:\n    raise SystemExit('target text not found')\np.write_text(s.replace(old, new))\nPY"
+    }
+  ],
+  "validation": {
+    "target_command": "go test ./filebeat/input/kafka -run TestKafkaInputTestNoPanicOnClientError -count=1",
+    "repeat": 1,
+    "success": { "exit_code": 0, "min_pass_rate": 1.0, "max_failures": 0 },
+    "neighbor_command": "go test ./filebeat/input/kafka -count=1",
+    "neighbor_success": { "exit_code": 0 }
+  },
+  "safety": {
+    "max_files_changed": 2,
+    "max_loc_changed": 30,
+    "allowed_paths": ["filebeat/input/kafka/*"]
+  },
+  "stuck": {
+    "max_same_failure_fingerprint": 2,
+    "max_attempts_without_improvement": 2
+  }
+}

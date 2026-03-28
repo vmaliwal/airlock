@@ -1,0 +1,33 @@
+{
+  "backend": { "kind": "lima" },
+  "sandbox": {
+    "namePrefix": "smoke-check",
+    "artifactsDir": "/tmp/airlock-smoke-artifacts",
+    "cpu": 2,
+    "memoryGiB": 4,
+    "diskGiB": 10,
+    "ttlMinutes": 20
+  },
+  "repo": {
+    "cloneUrl": "https://github.com/octocat/Hello-World.git",
+    "ref": "master"
+  },
+  "security": {
+    "bootstrapNetwork": "allowlist",
+    "bootstrapAllowHosts": ["archive.ubuntu.com", "security.ubuntu.com", "ports.ubuntu.com"],
+    "bootstrapAptPackages": ["git", "ca-certificates"],
+    "network": "allowlist",
+    "allowHosts": ["github.com"],
+    "allowedEnv": [],
+    "exportPaths": ["/airlock/artifacts"],
+    "includePatch": false
+  },
+  "steps": [
+    {
+      "name": "git-head",
+      "run": "git rev-parse HEAD && pwd && ls -la",
+      "timeoutSeconds": 120,
+      "allowFailure": false
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "objective": "Run a minimal campaign for the elastic/beats kafka alias issue in a disposable VM",
+  "mode": "mutate",
+  "airlock": {
+    "backend": { "kind": "lima" },
+    "sandbox": {
+      "namePrefix": "beats-kafka-alias-campaign",
+      "artifactsDir": "/tmp/airlock-beats-kafka-alias-campaign",
+      "cpu": 4,
+      "memoryGiB": 8,
+      "diskGiB": 20,
+      "ttlMinutes": 60
+    },
+    "repo": {
+      "cloneUrl": "https://github.com/elastic/beats.git",
+      "ref": "main"
+    },
+    "security": {
+      "bootstrapNetwork": "allowlist",
+      "bootstrapAllowHosts": ["archive.ubuntu.com", "security.ubuntu.com", "ports.ubuntu.com"],
+      "bootstrapAptPackages": ["git", "ca-certificates", "golang-go"],
+      "network": "allowlist",
+      "allowHosts": ["github.com", "proxy.golang.org", "sum.golang.org"],
+      "allowedEnv": [],
+      "exportPaths": ["/airlock/artifacts"],
+      "includePatch": true
+    },
+    "steps": [
+      { "name": "placeholder", "run": "true" }
+    ]
+  },
+  "setup": [
+    {
+      "name": "add repro test",
+      "command": "python3 - <<'PY'\nfrom pathlib import Path\np = Path('libbeat/common/kafka/zzz_repro_test.go')\np.write_text('''package kafka\\n\\nimport (\\n    \"testing\"\\n\\n    \"github.com/elastic/sarama\"\\n)\\n\\nfunc TestRepro_MajorVersionAliasUsesLatestMinor(t *testing.T) {\\n    got, ok := Version(\"4\").Get()\\n    if !ok {\\n        t.Fatal(\"Version(\\\"4\\\") should parse\")\\n    }\\n    if got != sarama.V4_1_0_0 {\\n        t.Fatalf(\"expected alias 4 to resolve to latest 4.x (%v), got %v\", sarama.V4_1_0_0, got)\\n    }\\n}\\n'''.replace('Version(\\\"4\\\") should parse', 'Version(\\\\\\\"4\\\\\\\") should parse'))\nPY",
+      "commit_message": "test: add kafka alias repro"
+    }
+  ],
+  "reproduction": {
+    "command": "go test ./libbeat/common/kafka -run TestRepro_MajorVersionAliasUsesLatestMinor -count=1",
+    "repeat": 1,
+    "success": { "min_failures": 1 }
+  },
+  "patches": [
+    {
+      "name": "map alias 4 to latest supported 4.x",
+      "command": "python3 - <<'PY'\nfrom pathlib import Path\np = Path('libbeat/common/kafka/version.go')\ns = p.read_text()\nold = '\t\t\"4\":   sarama.V4_0_0_0,\\n\t\t\"4.0\": sarama.V4_0_0_0,\\n\t\t\"4.1\": sarama.V4_1_0_0,\\n'\nnew = '\t\t\"4\":   sarama.V4_1_0_0,\\n\t\t\"4.0\": sarama.V4_0_0_0,\\n\t\t\"4.1\": sarama.V4_1_0_0,\\n'\nif old not in s:\n    raise SystemExit('target text not found')\np.write_text(s.replace(old, new))\nPY"
+    }
+  ],
+  "validation": {
+    "target_command": "go test ./libbeat/common/kafka -run TestRepro_MajorVersionAliasUsesLatestMinor -count=1",
+    "repeat": 1,
+    "success": { "exit_code": 0, "min_pass_rate": 1.0, "max_failures": 0 },
+    "neighbor_command": "go test ./libbeat/common/kafka -count=1",
+    "neighbor_success": { "exit_code": 0 }
+  },
+  "campaign": {
+    "inventory_command": "go test ./libbeat/common/kafka -run TestRepro_MajorVersionAliasUsesLatestMinor -count=1",
+    "success": {
+      "max_total_failures": 0,
+      "must_remove_fingerprints": ["package_failure:github.com/elastic/beats/v7/libbeat/common/kafka"],
+      "must_not_introduce_fingerprints": true
+    }
+  },
+  "safety": {
+    "max_files_changed": 2,
+    "max_loc_changed": 40,
+    "allowed_paths": ["libbeat/common/kafka/*"]
+  },
+  "stuck": {
+    "max_same_failure_fingerprint": 2,
+    "max_attempts_without_improvement": 2
+  }
+}
