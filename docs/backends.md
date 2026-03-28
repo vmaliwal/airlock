@@ -34,10 +34,15 @@ Requirements:
 
 Flow:
 1. upload payload bundle to Linux runner host
-2. invoke host shim to create microVM
+2. invoke host shim to stage ingress and call the Firecracker driver
 3. run guest payload inside microVM
 4. collect artifacts from runner host
 5. destroy microVM resources
+
+Reference assets:
+- shim contract: `docs/firecracker-host-shim.md`
+- host setup guide: `docs/firecracker-host-setup.md`
+- reference shim script: `scripts/firecracker/airlock-firecracker-host.sh`
 
 Current parity note:
 - Firecracker orchestration now stages guest helper binaries when contracts reference `/tmp/airlock` or `/tmp/airlock-researchguest`

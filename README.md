@@ -20,7 +20,9 @@ Current parity note:
 - Lima has the proven guest-binary path for `/tmp/airlock` and `/tmp/airlock-researchguest`
 - Firecracker now stages guest helper binaries and passes explicit `--copy-in` mappings to the host shim
 - the expected shim interface is documented in `docs/firecracker-host-shim.md`
-- full Firecracker parity still depends on host-shim `--copy-in` support and validated end-to-end Linux/cloud runs
+- a reference shim now exists at `scripts/firecracker/airlock-firecracker-host.sh`
+- host bring-up is documented in `docs/firecracker-host-setup.md`
+- full Firecracker parity still depends on validated driver + end-to-end Linux/cloud runs
 
 ## Why Go
 

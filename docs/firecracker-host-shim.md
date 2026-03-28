@@ -5,11 +5,14 @@ This document defines the contract Airlock expects from `airlock-firecracker-hos
 Status:
 - required for real Firecracker parity
 - backend integration in Airlock now assumes this interface
-- end-to-end validation remains blocked until a real shim implementation exists on a Linux/Firecracker host
+- reference shim script now exists at `scripts/firecracker/airlock-firecracker-host.sh`
+- end-to-end validation remains blocked until a real Linux/Firecracker driver path is implemented and validated
 
 ## Purpose
 
 The host shim is the **small trusted host-side adapter** between Airlock's control plane and a Linux host capable of launching Firecracker microVMs.
+
+In this repo, the reference shim is intentionally thin and delegates raw microVM mechanics to a narrower driver hook.
 
 It is responsible for:
 - preparing a disposable microVM root/work area

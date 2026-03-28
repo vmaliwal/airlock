@@ -471,6 +471,8 @@ Use this section as an ongoing journal of gap discoveries and refinements.
 - Firecracker backend now stages guest helper binaries for contracts that require `/tmp/airlock` or `/tmp/airlock-researchguest` and passes explicit `--copy-in` mappings to the host shim.
 - Remaining Firecracker gap is now narrower: host-shim `--copy-in` support and validated end-to-end Linux/cloud runs.
 - Added a first-class host-shim contract doc: `docs/firecracker-host-shim.md`.
+- Added a reference host shim script: `scripts/firecracker/airlock-firecracker-host.sh`.
+- Added a Linux bring-up guide: `docs/firecracker-host-setup.md`.
 - Expanded typed mutation support with `create_file` and `apply_patch`.
 - Expanded semantic mutation support with `ensure_line`, `nil_guard`, and `error_return`.
 - Added lessons-aware mutation-family ranking in planning, with optional lesson corpus input via `AIRLOCK_LESSONS_ROOT`.
