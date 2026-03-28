@@ -74,6 +74,11 @@ Important probe statuses:
 - `partial_runnable_scope`: a concrete subdir/package scope is selected and should stay narrow
 - `env_config_blocked`: execution context is still underspecified
 
+Current warning taxonomy:
+- `service_dependent`
+- `integration_blocked`
+- `flaky_candidate`
+
 Template scaffolding:
 - `airlock template research`
 - `airlock template campaign`
@@ -106,7 +111,10 @@ Execution note:
 Autofix and planning learning:
 - attempt lessons are stored in `lessons.jsonl`
 - autofix ranking uses prior success/failure, mutation kind, and optional `fingerprint_hints`
-- `airlock plan` now ranks mutation families using repo-type defaults plus prior lessons
+- `airlock plan` now ranks mutation families using:
+  - repo-type defaults
+  - failure-text-derived fingerprint hints
+  - prior lessons
 - `airlock plan` accepts either a repo path or a JSON plan input carrying issue URL, failing command, and failure text
 - set `AIRLOCK_LESSONS_ROOT` to point planning at a broader lesson corpus
 - this is an early step toward fingerprint-aware planning instead of static candidate order

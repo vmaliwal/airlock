@@ -48,6 +48,7 @@ func DetectRepo(startPath string) (RepoProfile, error) {
 
 func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 	blockers := []string{}
+	warnings := []string{}
 	evidence := []string{"repo_root=" + profile.RepoRoot, "target_path=" + profile.TargetPath}
 	hostRunnable := true
 	vmRunnable := true
@@ -127,6 +128,12 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 		recommended = "vm"
 		evidence = append(evidence, "subdir-targeted scope detected")
 	}
+	if hasServiceHints(profile.DetectedFiles) {
+		warnings = append(warnings, "service_dependent")
+	}
+	if hasIntegrationHints(profile.DetectedFiles) {
+		warnings = append(warnings, "integration_blocked")
+	}
 	return RepoAssessment{
 		Runnable:             hostRunnable,
 		HostRunnable:         hostRunnable,
@@ -136,6 +143,7 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 		PossibleModes:        modes,
 		Blockers:             blockers,
 		Evidence:             evidence,
+		Warnings:             dedupeStrings(warnings),
 	}, nil
 }
 
@@ -323,4 +331,22 @@ func pythonBootstrapHints(root string) []string {
 		hints = append(hints, "python dependency manifest may require project-specific bootstrap")
 	}
 	return hints
+}
+
+func hasServiceHints(files []string) bool {
+	for _, name := range []string{"docker-compose.yml", "compose.yml"} {
+		if contains(files, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasIntegrationHints(files []string) bool {
+	for _, name := range []string{"tox.ini", "docker-compose.yml", "compose.yml"} {
+		if contains(files, name) {
+			return true
+		}
+	}
+	return false
 }

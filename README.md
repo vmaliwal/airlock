@@ -110,8 +110,15 @@ Autofix/attempt mutations can now use:
 - `replace_line`
 - `create_file`
 - `apply_patch`
+- `ensure_line`
+- `nil_guard`
+- `error_return`
 
-And planning/attempt ordering can be influenced by prior lessons plus optional `fingerprint_hints`.
+Planning/attempt ordering can now use:
+- repo-type defaults
+- failure-text-derived fingerprint hints
+- prior lessons plus optional `fingerprint_hints`
+
 Set `AIRLOCK_LESSONS_ROOT=/path/to/lessons` to feed a broader lesson corpus into planning.
 
 ## Example run

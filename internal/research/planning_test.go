@@ -61,4 +61,13 @@ func TestPlanFromInputCarriesBugSignal(t *testing.T) {
 	if report.Input.IssueURL == "" || len(report.CandidateCommands) == 0 {
 		t.Fatalf("expected bug signal to carry into report: %#v", report)
 	}
+	found := false
+	for _, item := range report.Investigation.Assessment.Warnings {
+		if item == "flaky_candidate" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected flaky_candidate warning, got %#v", report.Investigation.Assessment.Warnings)
+	}
 }

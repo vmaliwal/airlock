@@ -40,6 +40,20 @@ type EnsureLineMutation struct {
 	Line string `json:"line"`
 }
 
+type NilGuardMutation struct {
+	Path        string `json:"path"`
+	AnchorText  string `json:"anchorText"`
+	GuardLine   string `json:"guardLine"`
+	InsertAfter string `json:"insertAfter,omitempty"`
+}
+
+type ErrorReturnMutation struct {
+	Path        string `json:"path"`
+	AnchorText  string `json:"anchorText"`
+	ReturnLine  string `json:"returnLine"`
+	InsertAfter string `json:"insertAfter,omitempty"`
+}
+
 type MutationSpec struct {
 	SearchReplace *SearchReplaceMutation `json:"search_replace,omitempty"`
 	InsertAfter   *InsertAfterMutation   `json:"insert_after,omitempty"`
@@ -47,6 +61,8 @@ type MutationSpec struct {
 	CreateFile    *CreateFileMutation    `json:"create_file,omitempty"`
 	ApplyPatch    *ApplyPatchMutation    `json:"apply_patch,omitempty"`
 	EnsureLine    *EnsureLineMutation    `json:"ensure_line,omitempty"`
+	NilGuard      *NilGuardMutation      `json:"nil_guard,omitempty"`
+	ErrorReturn   *ErrorReturnMutation   `json:"error_return,omitempty"`
 }
 
 type AttemptFile struct {
@@ -100,7 +116,7 @@ func ValidateAttemptFile(c AttemptFile) []string {
 	if c.Attempt.Validation.Command == "" {
 		errs = append(errs, "attempt.validation.command is required")
 	}
-	if c.Attempt.MutationCommand == "" && c.Mutation.SearchReplace == nil && c.Mutation.InsertAfter == nil && c.Mutation.ReplaceLine == nil && c.Mutation.CreateFile == nil && c.Mutation.ApplyPatch == nil && c.Mutation.EnsureLine == nil {
+	if c.Attempt.MutationCommand == "" && c.Mutation.SearchReplace == nil && c.Mutation.InsertAfter == nil && c.Mutation.ReplaceLine == nil && c.Mutation.CreateFile == nil && c.Mutation.ApplyPatch == nil && c.Mutation.EnsureLine == nil && c.Mutation.NilGuard == nil && c.Mutation.ErrorReturn == nil {
 		errs = append(errs, "attempt requires mutationCommand or supported mutation spec")
 	}
 	return errs
@@ -208,6 +224,12 @@ func ApplyMutationSpec(repo string, m MutationSpec) (CommandResult, error) {
 		}
 		return CommandResult{Command: "ensure_line", ExitCode: 0}, nil
 	}
+	if m.NilGuard != nil {
+		return applySemanticInsert(repo, "nil_guard", m.NilGuard.Path, m.NilGuard.AnchorText, m.NilGuard.GuardLine, m.NilGuard.InsertAfter)
+	}
+	if m.ErrorReturn != nil {
+		return applySemanticInsert(repo, "error_return", m.ErrorReturn.Path, m.ErrorReturn.AnchorText, m.ErrorReturn.ReturnLine, m.ErrorReturn.InsertAfter)
+	}
 	return CommandResult{Command: "mutation", ExitCode: 1, Stderr: "no supported mutation spec provided"}, nil
 }
 
@@ -230,6 +252,12 @@ func MutationKind(m MutationSpec, attempt AttemptSpec) string {
 	if m.EnsureLine != nil {
 		return "ensure_line"
 	}
+	if m.NilGuard != nil {
+		return "nil_guard"
+	}
+	if m.ErrorReturn != nil {
+		return "error_return"
+	}
 	if attempt.MutationCommand != "" {
 		return "command"
 	}
@@ -250,7 +278,7 @@ func RunAttemptFile(c AttemptFile) (AttemptOutcome, error) {
 	}
 	attempt := c.Attempt
 	attempt.Timeout = 30 * time.Second
-	if c.Mutation.SearchReplace != nil || c.Mutation.InsertAfter != nil || c.Mutation.ReplaceLine != nil || c.Mutation.CreateFile != nil || c.Mutation.ApplyPatch != nil || c.Mutation.EnsureLine != nil {
+	if c.Mutation.SearchReplace != nil || c.Mutation.InsertAfter != nil || c.Mutation.ReplaceLine != nil || c.Mutation.CreateFile != nil || c.Mutation.ApplyPatch != nil || c.Mutation.EnsureLine != nil || c.Mutation.NilGuard != nil || c.Mutation.ErrorReturn != nil {
 		attempt.MutationCommand = ""
 	}
 	outcome, err := RunNativeAttemptWithMutation(c.Repo, c.ArtifactsDir, checkpoint, attempt, c.Mutation)
@@ -287,4 +315,29 @@ func AppendLesson(path string, lesson LessonRecord) error {
 func containsText(s, sub string) bool { return strings.Contains(s, sub) }
 func replaceOnce(s, oldText, newText string) string {
 	return strings.Replace(s, oldText, newText, 1)
+}
+
+func applySemanticInsert(repo, command, relPath, anchorText, insertLine, insertAfter string) (CommandResult, error) {
+	path := filepath.Join(repo, relPath)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return CommandResult{Command: command, ExitCode: 1, Stderr: err.Error()}, nil
+	}
+	content := string(data)
+	if strings.Contains(content, insertLine) {
+		return CommandResult{Command: command, ExitCode: 0}, nil
+	}
+	anchor := anchorText
+	if insertAfter != "" {
+		anchor = insertAfter
+	}
+	if !strings.Contains(content, anchor) {
+		return CommandResult{Command: command, ExitCode: 1, Stderr: "anchorText not found"}, nil
+	}
+	replacement := anchor + "\n" + insertLine
+	content = strings.Replace(content, anchor, replacement, 1)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return CommandResult{Command: command, ExitCode: 1, Stderr: err.Error()}, nil
+	}
+	return CommandResult{Command: command, ExitCode: 0}, nil
 }

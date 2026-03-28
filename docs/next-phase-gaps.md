@@ -470,8 +470,11 @@ Use this section as an ongoing journal of gap discoveries and refinements.
 - Tightened contract validation: `security.exportPaths` is now required, and Firecracker mode must be `local` or `ssh`.
 - Firecracker backend now fails honestly for contracts that require guest binary injection (`/tmp/airlock`, `/tmp/airlock-researchguest`) instead of implying parity that does not yet exist.
 - Expanded typed mutation support with `create_file` and `apply_patch`.
+- Expanded semantic mutation support with `ensure_line`, `nil_guard`, and `error_return`.
 - Added lessons-aware mutation-family ranking in planning, with optional lesson corpus input via `AIRLOCK_LESSONS_ROOT`.
+- Planning now uses failure-text-derived fingerprint hints plus prior lessons to rank mutation families more intelligently.
 - Expanded classification with `bootstrap_needed_vm_preferred`, `partial_runnable_scope`, and `env_config_blocked`.
+- Added warning-level taxonomy for `service_dependent`, `integration_blocked`, and `flaky_candidate`.
 - Fixed a real probe issue: repo root detection now prefers the git root over the nearest nested manifest so subdir/package scope is preserved honestly.
 - Added host-toolchain-blocked-but-VM-runnable classification.
 - Added VM auto-routing for `attempt-run` and `autofix-run`.

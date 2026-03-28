@@ -76,6 +76,25 @@ func strategyHintsFor(profile RepoProfile, assessment RepoAssessment) []string {
 	if assessment.Status == "structurally_blocked" {
 		hints = append(hints, "do not mutate until bootstrap/source blockers are resolved")
 	}
+	if assessment.Status == "bootstrap_needed_vm_preferred" {
+		hints = append(hints, "bootstrap is likely required before honest execution; prefer VM-backed bootstrap first")
+	}
+	if assessment.Status == "partial_runnable_scope" {
+		hints = append(hints, "keep planning scoped to the chosen subdir/package instead of broad repo-wide commands")
+	}
+	if assessment.Status == "env_config_blocked" {
+		hints = append(hints, "runtime/config context is still missing; gather execution context before mutation")
+	}
+	for _, warning := range assessment.Warnings {
+		switch warning {
+		case "service_dependent":
+			hints = append(hints, "service-dependent repo signals detected; avoid pretending unit-only behavior covers the whole system")
+		case "integration_blocked":
+			hints = append(hints, "integration-oriented repo signals detected; expect environment/bootstrap dependencies in honest runs")
+		case "flaky_candidate":
+			hints = append(hints, "failure text suggests a stability/hang class; prefer bounded reruns and timeout-aware reproduction")
+		}
+	}
 	return dedupeStrings(hints)
 }
 

@@ -35,6 +35,7 @@ type RepoProfile struct {
 	DetectedFiles     []string `json:"detectedFiles"`
 	DiscoveredTargets []string `json:"discoveredTargets,omitempty"`
 	BaselineCommands  []string `json:"baselineCommands"`
+	BootstrapHints    []string `json:"bootstrapHints,omitempty"`
 }
 
 type RepoAssessment struct {
@@ -46,6 +47,7 @@ type RepoAssessment struct {
 	PossibleModes        []string `json:"possibleModes"`
 	Blockers             []string `json:"blockers"`
 	Evidence             []string `json:"evidence"`
+	Warnings             []string `json:"warnings,omitempty"`
 }
 
 type FailureFingerprint struct {

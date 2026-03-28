@@ -135,6 +135,34 @@ func TestAssessRepoBootstrapNeededNode(t *testing.T) {
 	}
 }
 
+func TestAssessRepoServiceAndIntegrationWarnings(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-service-warning-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := os.WriteFile(filepath.Join(repo, "package.json"), []byte("{\"name\":\"example\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "package-lock.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "docker-compose.yml"), []byte("services:{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := DetectRepo(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assessment, err := AssessRepo(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(assessment.Warnings) == 0 {
+		t.Fatalf("expected warnings, got %#v", assessment)
+	}
+}
+
 func TestAssessRepoPartialRunnableScope(t *testing.T) {
 	repo, err := os.MkdirTemp("", "airlock-partial-scope-")
 	if err != nil {

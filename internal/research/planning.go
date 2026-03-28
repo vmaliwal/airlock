@@ -1,11 +1,9 @@
 package research
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"strings"
 )
 
 const LessonsRootEnv = "AIRLOCK_LESSONS_ROOT"
@@ -25,11 +23,6 @@ type PlanReport struct {
 	CandidateCommands    []string            `json:"candidateCommands,omitempty"`
 }
 
-type loadedLesson struct {
-	Lesson LessonRecord
-	Path   string
-}
-
 func PlanRepo(path string, vmBackend string, allowHostExecution bool) (PlanReport, error) {
 	return PlanFromInput(PlanInput{RepoPath: path}, vmBackend, allowHostExecution)
 }
@@ -39,9 +32,14 @@ func PlanFromInput(input PlanInput, vmBackend string, allowHostExecution bool) (
 	if err != nil {
 		return PlanReport{}, err
 	}
+	if looksFlakyOrHang(input.FailureText) {
+		investigation.Assessment.Warnings = dedupeStrings(append(investigation.Assessment.Warnings, "flaky_candidate"))
+		investigation.StrategyHints = dedupeStrings(append(investigation.StrategyHints, "failure text suggests a flaky/hang class; prefer bounded reruns, timeouts, and stability-oriented validation"))
+	}
 	roots := lessonSearchRoots(investigation.Profile.RepoRoot)
 	lessons := loadLessonsFromRoots(roots)
-	ranked := rankMutationKinds(investigation.Profile, lessons)
+	fingerprintHints := collectFingerprintHintsFromFailureText(input.FailureText)
+	ranked := rankMutationKindsWithContext(investigation.Profile, lessons, fingerprintHints)
 	actionKinds := candidateActionKinds(ranked)
 	candidateCommands := rankedCommands(input, investigation)
 	return PlanReport{
@@ -64,74 +62,6 @@ func lessonSearchRoots(repoRoot string) []string {
 		roots = append(roots, filepath.Dir(repoRoot))
 	}
 	return dedupeStrings(roots)
-}
-
-func loadLessonsFromRoots(roots []string) []loadedLesson {
-	var out []loadedLesson
-	for _, root := range roots {
-		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info == nil || info.IsDir() || info.Name() != "lessons.jsonl" {
-				return nil
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return nil
-			}
-			for _, line := range stringsSplitLines(string(data)) {
-				if line == "" {
-					continue
-				}
-				var lesson LessonRecord
-				if json.Unmarshal([]byte(line), &lesson) == nil {
-					out = append(out, loadedLesson{Lesson: lesson, Path: path})
-				}
-			}
-			return nil
-		})
-	}
-	return out
-}
-
-func rankMutationKinds(profile RepoProfile, lessons []loadedLesson) []MutationKindScore {
-	scores := map[string]int{}
-	reasons := map[string][]string{}
-	for _, kind := range defaultMutationKinds(profile.RepoType) {
-		scores[kind] += 1
-		reasons[kind] = append(reasons[kind], fmt.Sprintf("repo_type_default:%s", profile.RepoType))
-	}
-	for _, item := range lessons {
-		kind := item.Lesson.MutationKind
-		if kind == "" || kind == "unknown" {
-			continue
-		}
-		weight := 0
-		if item.Lesson.Success {
-			weight += 5
-		} else {
-			weight -= 1
-		}
-		if samePath(item.Lesson.Repo, profile.RepoRoot) || samePath(item.Lesson.Repo, profile.RepoPath) {
-			weight += 5
-			reasons[kind] = append(reasons[kind], "same_repo_lesson")
-		}
-		scores[kind] += weight
-		if item.Lesson.Success {
-			reasons[kind] = append(reasons[kind], "prior_success")
-		} else {
-			reasons[kind] = append(reasons[kind], "prior_failure")
-		}
-	}
-	var ranked []MutationKindScore
-	for kind, score := range scores {
-		ranked = append(ranked, MutationKindScore{Kind: kind, Score: score, Reasons: dedupeStrings(reasons[kind])})
-	}
-	sort.SliceStable(ranked, func(i, j int) bool {
-		if ranked[i].Score == ranked[j].Score {
-			return ranked[i].Kind < ranked[j].Kind
-		}
-		return ranked[i].Score > ranked[j].Score
-	})
-	return ranked
 }
 
 func defaultMutationKinds(repoType string) []string {
@@ -175,4 +105,14 @@ func rankedCommands(input PlanInput, investigation InvestigationReport) []string
 		out = append(out, "failure_text_present")
 	}
 	return dedupeStrings(out)
+}
+
+func looksFlakyOrHang(s string) bool {
+	s = strings.ToLower(s)
+	for _, needle := range []string{"timeout", "timed out", "hang", "flaky", "intermittent", "cancelled", "canceled"} {
+		if strings.Contains(s, needle) {
+			return true
+		}
+	}
+	return false
 }

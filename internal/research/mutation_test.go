@@ -3,6 +3,7 @@ package research
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -115,5 +116,53 @@ func TestApplyMutationSpecEnsureLine(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	if string(data) != "one\ntwo\n" {
 		t.Fatalf("unexpected file contents: %q", string(data))
+	}
+}
+
+func TestApplyMutationSpecNilGuard(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-mutation-nilguard-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	path := filepath.Join(repo, "a.go")
+	content := "func f(x *T) error {\n\tuse(x)\n\treturn nil\n}\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := ApplyMutationSpec(repo, MutationSpec{NilGuard: &NilGuardMutation{Path: "a.go", AnchorText: "func f(x *T) error {", GuardLine: "\tif x == nil { return nil }"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ExitCode != 0 {
+		t.Fatalf("expected success, got %#v", res)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "if x == nil") {
+		t.Fatalf("expected nil guard inserted, got %q", string(data))
+	}
+}
+
+func TestApplyMutationSpecErrorReturn(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-mutation-errreturn-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	path := filepath.Join(repo, "a.go")
+	content := "if err != nil {\n\tlog(err)\n}\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := ApplyMutationSpec(repo, MutationSpec{ErrorReturn: &ErrorReturnMutation{Path: "a.go", AnchorText: "if err != nil {", ReturnLine: "\treturn err"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ExitCode != 0 {
+		t.Fatalf("expected success, got %#v", res)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "return err") {
+		t.Fatalf("expected return inserted, got %q", string(data))
 	}
 }
