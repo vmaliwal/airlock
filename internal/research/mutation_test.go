@@ -94,3 +94,26 @@ func TestApplyMutationSpecApplyPatch(t *testing.T) {
 		t.Fatalf("unexpected file contents: %q", string(data))
 	}
 }
+
+func TestApplyMutationSpecEnsureLine(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-mutation-ensure-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	path := filepath.Join(repo, "a.txt")
+	if err := os.WriteFile(path, []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := ApplyMutationSpec(repo, MutationSpec{EnsureLine: &EnsureLineMutation{Path: "a.txt", Line: "two"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ExitCode != 0 {
+		t.Fatalf("expected success, got %#v", res)
+	}
+	data, _ := os.ReadFile(path)
+	if string(data) != "one\ntwo\n" {
+		t.Fatalf("unexpected file contents: %q", string(data))
+	}
+}

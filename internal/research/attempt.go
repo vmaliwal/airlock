@@ -102,7 +102,7 @@ func RunNativeAttemptWithMutation(repo, artifactsDir, checkpointSHA string, spec
 	outcome := AttemptOutcome{Name: spec.Name, BaseSHA: checkpointSHA, ResetApplied: true}
 	var mutation CommandResult
 	var err error
-	if mutationSpec.SearchReplace != nil || mutationSpec.InsertAfter != nil || mutationSpec.ReplaceLine != nil || mutationSpec.CreateFile != nil || mutationSpec.ApplyPatch != nil {
+	if mutationSpec.SearchReplace != nil || mutationSpec.InsertAfter != nil || mutationSpec.ReplaceLine != nil || mutationSpec.CreateFile != nil || mutationSpec.ApplyPatch != nil || mutationSpec.EnsureLine != nil {
 		mutation, err = ApplyMutationSpec(repo, mutationSpec)
 	} else {
 		mutation, err = RunLocalCommand(repo, spec.MutationCommand, spec.Timeout)

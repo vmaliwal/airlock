@@ -201,12 +201,12 @@ func runTemplate(kind string) {
 }
 
 func maybeRouteAttemptToVM(cfg research.AttemptFile) bool {
-	decision, backendKind, handled := decideExecutionRoute(cfg.Repo)
+	policy, handled := decideExecutionPolicy(cfg.Repo)
 	if !handled {
 		return false
 	}
-	if decision.Route == "vm" {
-		compiled, cerr := research.CompileAttemptFileToVMContract(cfg, backendKind)
+	if policy.Preflight.Route == "vm" {
+		compiled, cerr := research.CompileAttemptFileToVMContract(cfg, policy.BackendKind)
 		if cerr != nil {
 			fmt.Fprintln(os.Stderr, cerr)
 			os.Exit(1)
@@ -216,19 +216,19 @@ func maybeRouteAttemptToVM(cfg research.AttemptFile) bool {
 			fmt.Fprintln(os.Stderr, rerr)
 			os.Exit(1)
 		}
-		fmt.Println(toJSON(map[string]any{"summaryPath": summaryPath, "routedToVM": true, "backend": backendKind, "hostExecutionExceptionDeclared": research.HostExecutionExceptionDeclared()}))
+		fmt.Println(toJSON(map[string]any{"summaryPath": summaryPath, "routedToVM": true, "backend": policy.BackendKind, "hostExecutionExceptionDeclared": research.HostExecutionExceptionDeclared()}))
 		return true
 	}
 	return false
 }
 
 func maybeRouteAutofixToVM(cfg research.AutofixPlan) bool {
-	decision, backendKind, handled := decideExecutionRoute(cfg.Repo)
+	policy, handled := decideExecutionPolicy(cfg.Repo)
 	if !handled {
 		return false
 	}
-	if decision.Route == "vm" {
-		compiled, cerr := research.CompileAutofixPlanToVMContract(cfg, backendKind)
+	if policy.Preflight.Route == "vm" {
+		compiled, cerr := research.CompileAutofixPlanToVMContract(cfg, policy.BackendKind)
 		if cerr != nil {
 			fmt.Fprintln(os.Stderr, cerr)
 			os.Exit(1)
@@ -238,40 +238,38 @@ func maybeRouteAutofixToVM(cfg research.AutofixPlan) bool {
 			fmt.Fprintln(os.Stderr, rerr)
 			os.Exit(1)
 		}
-		fmt.Println(toJSON(map[string]any{"summaryPath": summaryPath, "routedToVM": true, "backend": backendKind, "hostExecutionExceptionDeclared": research.HostExecutionExceptionDeclared()}))
+		fmt.Println(toJSON(map[string]any{"summaryPath": summaryPath, "routedToVM": true, "backend": policy.BackendKind, "hostExecutionExceptionDeclared": research.HostExecutionExceptionDeclared()}))
 		return true
 	}
 	return false
 }
 
-func decideExecutionRoute(repo string) (research.PreflightDecision, contract.BackendKind, bool) {
+func decideExecutionPolicy(repo string) (research.ExecutionPolicyDecision, bool) {
 	backend := ""
-	var backendKind contract.BackendKind
 	if kind, err := selectAutoVMBackend(); err == nil {
 		backend = string(kind)
-		backendKind = kind
 	}
-	decision, err := research.PreflightRepo(repo, backend, research.HostExecutionExceptionDeclared())
+	policy, err := research.DecideExecutionPolicy(repo, backend, research.HostExecutionExceptionDeclared())
 	if err != nil {
-		return research.PreflightDecision{}, "", false
+		return research.ExecutionPolicyDecision{}, false
 	}
-	if decision.Route == "vm" {
-		if backendKind == "" {
+	if policy.Preflight.Route == "vm" {
+		if policy.BackendKind == "" {
 			fmt.Fprintln(os.Stderr, "host execution blocked by policy and no VM backend is ready")
 			fmt.Fprintf(os.Stderr, "declare %s=1 only for an explicit host exception\n", research.HostExecutionExceptionEnv)
 			os.Exit(1)
 		}
-		return decision, backendKind, true
+		return policy, true
 	}
-	if decision.Route == "stop" {
-		fmt.Fprintln(os.Stderr, decision.Reason)
+	if policy.Preflight.Route == "stop" {
+		fmt.Fprintln(os.Stderr, policy.Preflight.Reason)
 		os.Exit(1)
 	}
 	if !research.HostExecutionExceptionDeclared() {
 		fmt.Fprintf(os.Stderr, "host execution blocked by policy; declare %s=1 only for an explicit host exception\n", research.HostExecutionExceptionEnv)
 		os.Exit(1)
 	}
-	return decision, backendKind, false
+	return policy, false
 }
 
 func runAttempt(path string) {
