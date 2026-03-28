@@ -12,6 +12,10 @@ Purpose:
 - anchor roadmap work in real evidence from runs against actual repositories
 - serve as the single roadmap document for gaps, candidate repos, policy changes, and security posture
 
+Companion docs:
+- issue-style backlog: `docs/product-issues.md`
+- active repo queue: `docs/oss-validation-queue.md`
+
 ## Vision Reference
 
 Target vision:
@@ -31,6 +35,7 @@ Effective now:
 - do not use hand-authored repo-specific research contracts as the normal path
 - allow manual contracts only when the goal is debugging Airlock itself or isolating a missing Airlock capability
 - every time a manual contract is required, record the missing planner/runtime capability here as a gap
+- every newly exposed product failure should be logged in `docs/product-issues.md` before implementation unless it is already tracked there
 
 Implication:
 - normal repo work should start from a bug signal, not a handcrafted execution plan
