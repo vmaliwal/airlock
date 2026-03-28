@@ -27,6 +27,10 @@ func PreflightRepo(path string, vmBackend string) (PreflightDecision, error) {
 		decision.Route = "stop"
 		decision.Reason = "repo is structurally blocked; do not attempt mutation until source/bootstrap blockers are resolved"
 		decision.SuggestedNextActions = []string{"inspect blockers", "repair bootstrap/source-of-truth", "rerun probe"}
+	case "monorepo_target_required":
+		decision.Route = "stop"
+		decision.Reason = "repo root is a monorepo entrypoint; choose a concrete package/module target before running attempts"
+		decision.SuggestedNextActions = append(decision.SuggestedNextActions, assessment.Evidence...)
 	case "host_toolchain_blocked_vm_runnable":
 		decision.Route = "vm"
 		decision.Reason = "host toolchain is insufficient; route validation/mutation into a disposable VM"

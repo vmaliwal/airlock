@@ -11,12 +11,17 @@ import (
 const researchRunnerTemplate = `/tmp/airlock-researchguest __CONTRACT_B64__`
 
 func CompileRunContract(c RunContract) (base.Contract, error) {
-	payload, err := json.Marshal(c)
+	rc := c
+	if subdir := rc.Airlock.Repo.Subdir; subdir != "" {
+		rc.Safety.AllowedPaths = prefixPaths(subdir, rc.Safety.AllowedPaths)
+		rc.Safety.ForbiddenPaths = prefixPaths(subdir, rc.Safety.ForbiddenPaths)
+	}
+	payload, err := json.Marshal(rc)
 	if err != nil {
 		return base.Contract{}, err
 	}
 	stepCommand := strings.ReplaceAll(researchRunnerTemplate, "__CONTRACT_B64__", base64.StdEncoding.EncodeToString(payload))
-	air := c.Airlock
+	air := rc.Airlock
 	air.Steps = []base.Step{{Name: "research-runner", Run: stepCommand, TimeoutSeconds: 3600, AllowFailure: false}}
 	return air, nil
 }

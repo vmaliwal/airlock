@@ -131,6 +131,8 @@ Recommended next three:
   - `cli/cli` — ~43k stars, ~949 open issues
   - `charmbracelet/gum` — ~23k stars, ~150 open issues
 - First Airlock pass results:
-  - `langchain-ai/langchain` root currently exposes a probe gap for monorepo root detection; package subdirs like `libs/core` probe correctly.
+  - `langchain-ai/langchain` root initially exposed a probe gap for monorepo root detection; package subdirs like `libs/core` probed correctly.
   - `cli/cli` is a strong VM-routed Go candidate.
   - `charmbracelet/gum` is another strong VM-routed Go candidate with a smaller/more tractable surface.
+- `langchain-ai/langchain` (`libs/core`) is now a validated success target for issue `#36297`.
+- `charmbracelet/gum` is now a validated success target for file height accounting in `file/file.go`.

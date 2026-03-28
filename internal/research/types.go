@@ -28,12 +28,13 @@ type CommandResult struct {
 }
 
 type RepoProfile struct {
-	RepoPath         string   `json:"repoPath"`
-	RepoRoot         string   `json:"repoRoot"`
-	TargetPath       string   `json:"targetPath"`
-	RepoType         string   `json:"repoType"`
-	DetectedFiles    []string `json:"detectedFiles"`
-	BaselineCommands []string `json:"baselineCommands"`
+	RepoPath          string   `json:"repoPath"`
+	RepoRoot          string   `json:"repoRoot"`
+	TargetPath        string   `json:"targetPath"`
+	RepoType          string   `json:"repoType"`
+	DetectedFiles     []string `json:"detectedFiles"`
+	DiscoveredTargets []string `json:"discoveredTargets,omitempty"`
+	BaselineCommands  []string `json:"baselineCommands"`
 }
 
 type RepoAssessment struct {

@@ -17,6 +17,7 @@ func DetectRepo(startPath string) (RepoProfile, error) {
 	}
 	repoRoot := detectRepoRoot(targetPath)
 	detectedFiles := detectFiles(repoRoot)
+	discoveredTargets := []string{}
 	repoType := "unknown"
 	switch {
 	case contains(detectedFiles, "go.mod"):
@@ -27,14 +28,17 @@ func DetectRepo(startPath string) (RepoProfile, error) {
 		repoType = "python"
 	case contains(detectedFiles, "Cargo.toml"):
 		repoType = "rust"
+	default:
+		discoveredTargets = discoverNestedTargets(repoRoot, 3)
 	}
 	return RepoProfile{
-		RepoPath:         startPath,
-		RepoRoot:         repoRoot,
-		TargetPath:       targetPath,
-		RepoType:         repoType,
-		DetectedFiles:    detectedFiles,
-		BaselineCommands: baselineCommandsFor(repoType, repoRoot, targetPath),
+		RepoPath:          startPath,
+		RepoRoot:          repoRoot,
+		TargetPath:        targetPath,
+		RepoType:          repoType,
+		DetectedFiles:     detectedFiles,
+		DiscoveredTargets: discoveredTargets,
+		BaselineCommands:  baselineCommandsFor(repoType, repoRoot, targetPath),
 	}, nil
 }
 
@@ -44,6 +48,13 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 	hostRunnable := true
 	vmRunnable := true
 	toolchainBlocked := false
+	if profile.RepoType == "unknown" && len(profile.DiscoveredTargets) > 0 && samePath(profile.TargetPath, profile.RepoRoot) {
+		blockers = append(blockers, "monorepo root needs a concrete package target")
+		evidence = append(evidence, "discovered_nested_targets="+strconv.Itoa(len(profile.DiscoveredTargets)))
+		for _, target := range profile.DiscoveredTargets {
+			evidence = append(evidence, "candidate_target="+target)
+		}
+	}
 	if profile.RepoType == "go" {
 		goModBytes, err := os.ReadFile(filepath.Join(profile.RepoRoot, "go.mod"))
 		if err == nil {
@@ -88,6 +99,9 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 	modes := []string{"structural", "functional", "stability", "campaign"}
 	if len(blockers) > 0 {
 		status = "structurally_blocked"
+		if len(profile.DiscoveredTargets) > 0 && samePath(profile.TargetPath, profile.RepoRoot) {
+			status = "monorepo_target_required"
+		}
 		hostRunnable = false
 		vmRunnable = false
 		recommended = "none"
@@ -130,6 +144,33 @@ func detectFiles(root string) []string {
 		}
 	}
 	return files
+}
+
+func discoverNestedTargets(root string, maxDepth int) []string {
+	candidates := []string{}
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
+			return nil
+		}
+		if !contains([]string{"package.json", "go.mod", "pyproject.toml", "Cargo.toml"}, info.Name()) {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+		depth := strings.Count(rel, string(filepath.Separator))
+		if depth > maxDepth {
+			return nil
+		}
+		dir := filepath.Dir(path)
+		if dir == root {
+			return nil
+		}
+		candidates = append(candidates, dir)
+		return nil
+	})
+	return dedupeSorted(candidates)
 }
 
 func baselineCommandsFor(repoType, repoRoot, targetPath string) []string {
@@ -205,6 +246,29 @@ func parseVersionParts(v string) []int {
 }
 
 func exists(path string) bool { _, err := os.Stat(path); return err == nil }
+func samePath(a, b string) bool {
+	aa, err := filepath.Abs(a)
+	if err != nil {
+		return a == b
+	}
+	bb, err := filepath.Abs(b)
+	if err != nil {
+		return a == b
+	}
+	return aa == bb
+}
+func dedupeSorted(items []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
+}
 func contains(items []string, v string) bool {
 	for _, item := range items {
 		if item == v {

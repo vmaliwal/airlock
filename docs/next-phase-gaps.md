@@ -344,3 +344,12 @@ Use this section as an ongoing journal of gap discoveries and refinements.
   - `langchain-ai/langchain/libs/core` showed that subdir probing works fine once pointed at a concrete package.
   - `cli/cli` and `charmbracelet/gum` both validated the usefulness of the `host_toolchain_blocked_vm_runnable` route.
 - New nuance discovered: host toolchain classification is policy-sensitive. Raw host `go test ./...` can succeed for some repos via Go's auto-toolchain download, while Airlock intentionally treats host execution as blocked under local-toolchain-only policy. This likely needs clearer policy documentation or an explicit configurable stance.
+- Ran full VM-backed research successfully on `langchain-ai/langchain` (`libs/core`) for issue `#36297`.
+  - Real Airlock gap fixed: monorepo roots now stop with `monorepo_target_required` and enumerate concrete package targets.
+  - Real Airlock gap fixed: `research-run` now rebases safety allowlists when `repo.subdir` is set.
+  - Real workflow lesson: Python repos need venv-first bootstrap; system `pip install` inside Ubuntu guests is not sufficient because of PEP 668.
+  - Real workflow lesson: setup steps that only mutate local environment should not require a checkpoint commit.
+- Ran full VM-backed research successfully on `charmbracelet/gum` for issue `#1025`-style file height accounting.
+  - Confirmed a new real repo success outside Beats and LangChain.
+  - Learned that repo refs in contracts must be verified; `gum` required `main`, not `master`.
+  - Confirmed command-first, test-added-in-setup remediation works cleanly for smaller Go OSS repos.

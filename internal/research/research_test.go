@@ -70,6 +70,37 @@ func TestAssessRepoBlocksEmptyLocalReplaceTargets(t *testing.T) {
 	}
 }
 
+func TestAssessRepoMonorepoRootNeedsConcreteTarget(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-monorepo-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(repo, "libs", "core"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "libs", "core", "pyproject.toml"), []byte("[project]\nname='core'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := DetectRepo(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profile.DiscoveredTargets) == 0 {
+		t.Fatalf("expected discovered targets, got %#v", profile)
+	}
+	assessment, err := AssessRepo(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assessment.Status != "monorepo_target_required" || assessment.Runnable || assessment.VMRunnable {
+		t.Fatalf("unexpected assessment: %#v", assessment)
+	}
+}
+
 func TestCompareGoVersions(t *testing.T) {
 	if compareGoVersions("1.21.3", "1.24.0") >= 0 {
 		t.Fatal("expected 1.21.3 < 1.24.0")
