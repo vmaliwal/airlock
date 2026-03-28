@@ -195,3 +195,33 @@ Read the roadmap/policy docs.
 
 ### Notes
 This is important for trust and operator understanding, even if not a runtime blocker.
+
+## AIR-005 — Subdir package detection misses concrete Python target manifests
+- Status: `new`
+- Severity: `sev1`
+- Type: `classification`
+- First seen: `2026-03-28`
+- Reported by: `repo validation`
+- Source repo: `langchain-ai/langchain`
+- Source issue: `#36186`
+- Affected command: `airlock plan`, `airlock probe`, `airlock investigate`
+
+### Problem
+When targeting `libs/text-splitters` in LangChain, Airlock classified the target as `repoType: unknown` even though `libs/text-splitters/pyproject.toml` exists and the target path is already a concrete package scope.
+
+### Evidence
+- target path: `/Users/varun/repos/experiments/langchain/libs/text-splitters`
+- manifest present: `libs/text-splitters/pyproject.toml`
+- observed plan output reported `repoType: unknown` and no Python baseline commands
+
+### User impact
+Weakens planning quality, hides correct baseline commands, and risks turning runnable package targets into unnecessary manual work.
+
+### Expected
+If the selected target path contains `pyproject.toml`/`package.json`/`go.mod`/`Cargo.toml`, Airlock should classify that concrete target correctly even when repo root is higher.
+
+### Current workaround
+Point Airlock at a subdir that it already handles correctly or manually supply more context.
+
+### Notes
+This is a real product issue exposed by repo intake and should be fixed only after triage/prioritization, not silently during repo work.
