@@ -10,6 +10,7 @@ Purpose:
 - keep a running list of what is incomplete, risky, or underpowered
 - append new learnings instead of re-deriving them from scratch
 - anchor roadmap work in real evidence from runs against actual repositories
+- serve as the single roadmap document for gaps, candidate repos, policy changes, and security posture
 
 ## Vision Reference
 
@@ -22,6 +23,37 @@ Target vision:
 - broad issue-class coverage
 - VM-first execution substrate
 - eventually: “give me a bug, I’ll fix it”
+
+## Operating Policy
+
+### New policy: no handcrafted repo contracts by default
+Effective now:
+- do not use hand-authored repo-specific research contracts as the normal path
+- allow manual contracts only when the goal is debugging Airlock itself or isolating a missing Airlock capability
+- every time a manual contract is required, record the missing planner/runtime capability here as a gap
+
+Implication:
+- normal repo work should start from a bug signal, not a handcrafted execution plan
+- contracts remain as compiled/internal artifacts, not the primary operator interface
+
+### Security posture
+Required stance:
+- do not run unknown OSS repo code directly on the host as the default path
+- use VM-backed execution for untrusted repos:
+  - Lima on macOS
+  - Firecracker on Linux/cloud when parity is complete
+- host-side work is allowed only for:
+  - static inspection
+  - git metadata inspection
+  - non-executing file edits
+  - tightly bounded local validation against repos already under explicit operator control
+- if a repo requires execution and is not clearly trusted, route it into a disposable VM
+
+Current assessment:
+- current direction is materially safer than earlier host execution
+- Lima-backed execution is the active safe path today
+- Firecracker parity is still incomplete, so Linux/cloud security parity is not yet fully realized
+- manual local repros of unknown code should be treated as exceptions, not the standard workflow
 
 ## Gap Summary
 
@@ -228,92 +260,171 @@ Desired next state:
 Highest-priority gaps for the next phase:
 1. stronger repair planning
 2. better self-improvement from lessons
-3. first-class evals
-4. broader issue taxonomy + mutation taxonomy
-5. full backend parity
+3. unified engine behavior across modes
+4. broader mutation taxonomy
+5. broader probe/classification taxonomy
+6. full backend parity
+7. stronger explicit safety policy
+8. first-class evals
+9. higher-level bug intake UX
+10. better PR/reviewer-facing outputs
 
 ## Execution Plan
 
-This section translates the 10 gaps into concrete workstreams.
+This section translates the roadmap into concrete workstreams. The immediate focus is items 1 through 7 plus the new no-handcrafted-contract policy.
 
-### Workstream A — Planning + Strategy Synthesis
+### Workstream 1 — Planner and strategy synthesis
 Addresses:
 - Gap 1
-- Gap 2
-- part of Gap 4
 
 Deliverables:
-- strategy library keyed by fingerprint class
-- attempt synthesis rules for common failure families
-- ranking policy that uses lessons beyond exact attempt names
-- first strategy reports showing which mutation families win for which fingerprints
+- first-class `investigate` / `plan` flow
+- bug-signal intake from issue URL, failing command, or failure text
+- automatic target/subdir selection
+- reproduction candidate generation and ranking
+- validation candidate generation and ranking
+- strategy library keyed by failure fingerprint and repo class
 
 Success signals:
-- reduced attempts-to-success on repeated issue classes
-- better first-attempt win rate on benchmark tasks
+- fewer hand-authored plans
+- better first-attempt localization
+- better first-attempt success rate on repeated issue families
 
-### Workstream B — Unify Runtime Modes
+### Workstream 2 — Lessons-driven self-improvement
+Addresses:
+- Gap 2
+
+Deliverables:
+- persistent strategy priors driven by previous runs
+- fingerprint-to-strategy ranking
+- repo/ecosystem-aware bootstrap priors
+- mutation-family priors that materially affect future attempt ordering
+
+Success signals:
+- measurable reduction in attempts-to-success over time
+- new repos benefit from prior repo learnings without manual transfer
+
+### Workstream 3 — Unify runtime modes into one engine
 Addresses:
 - Gap 3
-- part of Gap 5
-- part of Gap 9
 
 Deliverables:
-- common preflight/routing layer across attempt/autofix/research/campaign
-- shared artifact naming and summary structures
-- route explanations visible in all mode outputs
+- one shared planning/routing model across `attempt`, `autofix`, `research`, and `campaign`
+- common artifact and summary conventions
+- shared route explanations and stop conditions
 
 Success signals:
-- less duplicated routing logic
-- same repo yields coherent route decisions regardless of entry mode
+- same repo/bug signal leads to coherent behavior regardless of entrypoint
+- less duplicated decision logic
 
-### Workstream C — Mutation + Classification Expansion
+### Workstream 4 — Expand mutation taxonomy and make mutations typed
 Addresses:
 - Gap 4
+
+Deliverables:
+- first-class typed actions instead of opaque inline shell as the default:
+  - create file
+  - edit file
+  - search/replace
+  - insert after
+  - replace line
+  - apply patch
+  - run command
+  - bootstrap helpers
+- additional repair families:
+  - nil guards
+  - early error returns
+  - import/config/bootstrap fixups
+  - scaffold/file creation
+  - dependency/bootstrap remediations
+  - eventually AST-aware transforms
+
+Success signals:
+- fewer brittle repo-specific shell blobs
+- more reusable and learnable repair actions
+
+### Workstream 5 — Expand probe and classification taxonomy
+Addresses:
 - Gap 5
 
 Deliverables:
-- additional mutation families:
-  - nil guard
-  - error return hardening
-  - import/config/bootstrap helpers
-  - file scaffold helpers
-- richer probe/preflight statuses for integration/env/service/bootstrap cases
+- richer routing states for:
+  - service-dependent failures
+  - env/config blockers
+  - flaky failures
+  - partial-runnable scopes
+  - bootstrap-needed repos
+- better route recommendations and stop reasons
 
 Success signals:
-- more real repo issues become addressable without hand-crafted mutations
-- fewer false starts on repos that should have been routed or stopped earlier
+- fewer false starts
+- cleaner distinction between blocked, VM-runnable, partially-runnable, and enriched-required repos
 
-### Workstream D — Backend Parity + Safety Codification
+### Workstream 6 — Backend parity
 Addresses:
 - Gap 6
+
+Deliverables:
+- Firecracker parity with Lima for guest runner behavior, routing, and artifact export
+- validated Linux/cloud runs for the same bug-fixing flows already proven on Lima
+
+Success signals:
+- same research classes succeed on both backends
+- Linux/cloud is no longer a design-only backend
+
+### Workstream 7 — Explicit safety policy enforcement
+Addresses:
 - Gap 7
 
 Deliverables:
-- Firecracker guest parity with Lima
-- safety policy matrix documented and enforced
-- clearer bootstrap-vs-validation network policy checks
-- more explicit unsafe-to-continue conditions
+- safety matrix encoded as enforceable checks
+- clearer host-vs-VM execution rules
+- explicit unsafe-to-continue stop conditions
+- stronger bootstrap vs validation network policy enforcement
+- policy checks that prevent casual execution of unknown repo code on the host
 
 Success signals:
-- same contract classes work across Lima and Firecracker
-- safety decisions become more inspectable and deterministic
+- security posture is inspectable, deterministic, and enforced by code
+- host execution of unknown code becomes an exceptional, visible override path
 
-### Workstream E — Evals + UX + Review Output
+### Workstream 8 — First-class evals
 Addresses:
 - Gap 8
-- Gap 9
-- Gap 10
 
 Deliverables:
 - `evals/` benchmark corpus
 - machine-readable eval summaries
-- higher-level task UX
-- PR/reviewer-facing output packet generation
+- cross-version score tracking
 
 Success signals:
-- capability gains become measurable over time
-- outputs are useful to maintainers, not just to Airlock itself
+- progress is measurable instead of anecdotal
+
+### Workstream 9 — Higher-level bug intake UX
+Addresses:
+- Gap 9
+
+Deliverables:
+- top-level `fix <bug-signal>` style operator UX
+- contracts become compiled/internal artifacts rather than the main authoring surface
+
+Success signals:
+- operator burden decreases significantly
+
+### Workstream 10 — PR/reviewer-facing outputs
+Addresses:
+- Gap 10
+
+Deliverables:
+- issue summary
+- repro summary
+- root cause
+- fix rationale
+- evidence table
+- residual uncertainty
+- draft PR body
+
+Success signals:
+- outputs are maintainer-consumable by default
 
 ## Real Evidence So Far
 
