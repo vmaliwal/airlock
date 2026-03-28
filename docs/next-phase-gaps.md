@@ -466,6 +466,9 @@ Use this section as an ongoing journal of gap discoveries and refinements.
 - Added first-class `investigate` and `plan` entrypoints.
 - `plan` now accepts either a repo path or structured JSON input carrying issue URL, failing command, and failure text.
 - Unified attempt/autofix host-vs-VM routing through shared preflight policy instead of ad hoc local checks.
+- Added shared compiled-contract execution helper so campaign execution and direct contract execution use the same backend/prereq path.
+- Tightened contract validation: `security.exportPaths` is now required, and Firecracker mode must be `local` or `ssh`.
+- Firecracker backend now fails honestly for contracts that require guest binary injection (`/tmp/airlock`, `/tmp/airlock-researchguest`) instead of implying parity that does not yet exist.
 - Expanded typed mutation support with `create_file` and `apply_patch`.
 - Added lessons-aware mutation-family ranking in planning, with optional lesson corpus input via `AIRLOCK_LESSONS_ROOT`.
 - Expanded classification with `bootstrap_needed_vm_preferred`, `partial_runnable_scope`, and `env_config_blocked`.

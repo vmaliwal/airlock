@@ -38,6 +38,11 @@ Flow:
 4. collect artifacts from runner host
 5. destroy microVM resources
 
+Current parity note:
+- Firecracker orchestration exists, but it does not yet have parity with the Lima guest-binary path
+- contracts requiring `/tmp/airlock` or `/tmp/airlock-researchguest` now fail explicitly instead of pretending support exists
+- full guest binary injection/copy parity is still an open gap
+
 ## Why both exist
 
 - Lima gives strong local isolation on macOS

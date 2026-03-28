@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/vmaliwal/airlock/internal/contract"
-	"github.com/vmaliwal/airlock/internal/runner"
 	"github.com/vmaliwal/airlock/internal/util"
 )
 
@@ -127,7 +126,7 @@ func RunCampaignPlan(planPath string, plan CampaignPlan) (string, error) {
 			}
 			continue
 		}
-		backendImpl, err := runner.NewBackend(compiled.Backend.Kind)
+		summaryPath, err := ExecuteCompiledContract(compiled)
 		if err != nil {
 			failed++
 			results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, Success: false, Error: err.Error()})
@@ -137,29 +136,10 @@ func RunCampaignPlan(planPath string, plan CampaignPlan) (string, error) {
 			}
 			continue
 		}
-		if errs := backendImpl.CheckPrereqs(); len(errs) > 0 {
-			failed++
-			results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, Success: false, Error: stringsJoin(errs)})
-			_ = AppendLesson(lessonsPath, LessonRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Repo: resolved, AttemptName: entry.Name, Success: false})
-			if plan.StopOnFailure {
-				break
-			}
-			continue
-		}
-		runResult, err := backendImpl.Run(compiled)
+		summaryData, err := os.ReadFile(summaryPath)
 		if err != nil {
 			failed++
-			results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, Success: false, Error: err.Error()})
-			_ = AppendLesson(lessonsPath, LessonRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Repo: resolved, AttemptName: entry.Name, Success: false})
-			if plan.StopOnFailure {
-				break
-			}
-			continue
-		}
-		summaryData, err := os.ReadFile(runResult.SummaryPath)
-		if err != nil {
-			failed++
-			results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, SummaryPath: runResult.SummaryPath, Success: false, Error: err.Error()})
+			results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, SummaryPath: summaryPath, Success: false, Error: err.Error()})
 			_ = AppendLesson(lessonsPath, LessonRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Repo: resolved, AttemptName: entry.Name, Success: false})
 			if plan.StopOnFailure {
 				break
@@ -169,7 +149,7 @@ func RunCampaignPlan(planPath string, plan CampaignPlan) (string, error) {
 		var summary contract.RunSummary
 		if err := json.Unmarshal(summaryData, &summary); err != nil {
 			failed++
-			results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, SummaryPath: runResult.SummaryPath, Success: false, Error: err.Error()})
+			results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, SummaryPath: summaryPath, Success: false, Error: err.Error()})
 			_ = AppendLesson(lessonsPath, LessonRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Repo: resolved, AttemptName: entry.Name, Success: false})
 			if plan.StopOnFailure {
 				break
@@ -181,7 +161,7 @@ func RunCampaignPlan(planPath string, plan CampaignPlan) (string, error) {
 		} else {
 			failed++
 		}
-		results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, SummaryPath: runResult.SummaryPath, Success: summary.Success})
+		results = append(results, CampaignEntryResult{Name: entry.Name, Contract: resolved, SummaryPath: summaryPath, Success: summary.Success})
 		_ = AppendLesson(lessonsPath, LessonRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Repo: resolved, AttemptName: entry.Name, Success: summary.Success})
 		if plan.StopOnFailure && !summary.Success {
 			break

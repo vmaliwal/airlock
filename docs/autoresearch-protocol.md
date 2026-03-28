@@ -99,6 +99,10 @@ Campaign flows:
 - `airlock campaign-validate <contract.json>`
 - `airlock campaign-run <contract.json>`
 
+Execution note:
+- campaign execution now uses the same compiled-contract execution helper path as other backend-driven flows
+- this reduces backend/prereq drift between campaign mode and direct contract execution
+
 Autofix and planning learning:
 - attempt lessons are stored in `lessons.jsonl`
 - autofix ranking uses prior success/failure, mutation kind, and optional `fingerprint_hints`

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/vmaliwal/airlock/internal/backend"
@@ -36,6 +37,9 @@ func (b Backend) CheckPrereqs() []string {
 }
 
 func (b Backend) Run(c contract.Contract) (backend.RunResult, error) {
+	if needsGuestBinaryInjection(c) {
+		return backend.RunResult{}, fmt.Errorf("firecracker backend does not yet support guest binary injection for /tmp/airlock or /tmp/airlock-researchguest steps")
+	}
 	fc := c.Backend.FirecrackerHost
 	if fc == nil {
 		return backend.RunResult{}, fmt.Errorf("missing firecracker host config")
@@ -111,4 +115,13 @@ func scpBaseArgs(fc *contract.FirecrackerHostConfig) []string {
 
 func shell(s string) string {
 	return "'" + s + "'"
+}
+
+func needsGuestBinaryInjection(c contract.Contract) bool {
+	for _, step := range c.Steps {
+		if strings.Contains(step.Run, "/tmp/airlock") || strings.Contains(step.Run, "/tmp/airlock-researchguest") {
+			return true
+		}
+	}
+	return false
 }

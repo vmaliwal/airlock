@@ -477,19 +477,7 @@ func runBaseContract(c contract.Contract) {
 }
 
 func executeBaseContract(c contract.Contract) (string, error) {
-	b, err := runner.NewBackend(c.Backend.Kind)
-	if err != nil {
-		return "", err
-	}
-	if errs := b.CheckPrereqs(); len(errs) > 0 {
-		data, _ := json.MarshalIndent(errs, "", "  ")
-		return "", fmt.Errorf(string(data))
-	}
-	result, err := b.Run(c)
-	if err != nil {
-		return "", err
-	}
-	return result.SummaryPath, nil
+	return research.ExecuteCompiledContract(c)
 }
 
 func selectAutoVMBackend() (contract.BackendKind, error) {

@@ -12,6 +12,7 @@ func TestValidateContract(t *testing.T) {
 	c.Sandbox.DiskGiB = 10
 	c.Repo.CloneURL = "https://github.com/elastic/beats.git"
 	c.Security.Network = NetworkDeny
+	c.Security.ExportPaths = []string{"/airlock/artifacts"}
 	c.Steps = []Step{{Name: "repro", Run: "go test ./..."}}
 
 	if errs := Validate(c); len(errs) != 0 {
@@ -30,10 +31,31 @@ func TestValidateContractFirecrackerSSH(t *testing.T) {
 	c.Repo.CloneURL = "https://github.com/elastic/beats.git"
 	c.Security.Network = NetworkAllowlist
 	c.Security.AllowHosts = []string{"github.com"}
+	c.Security.ExportPaths = []string{"/airlock/artifacts"}
 	c.Steps = []Step{{Name: "repro", Run: "go test ./..."}}
 
 	errs := Validate(c)
 	if len(errs) == 0 {
 		t.Fatal("expected firecracker host validation errors")
+	}
+}
+
+func TestValidateContractFirecrackerRejectsUnknownMode(t *testing.T) {
+	var c Contract
+	c.Backend.Kind = BackendFirecracker
+	c.Backend.FirecrackerHost = &FirecrackerHostConfig{Mode: "bogus"}
+	c.Sandbox.NamePrefix = "demo"
+	c.Sandbox.ArtifactsDir = "/tmp/demo"
+	c.Sandbox.CPU = 2
+	c.Sandbox.MemoryGiB = 4
+	c.Sandbox.DiskGiB = 10
+	c.Repo.CloneURL = "https://github.com/elastic/beats.git"
+	c.Security.Network = NetworkDeny
+	c.Security.ExportPaths = []string{"/airlock/artifacts"}
+	c.Steps = []Step{{Name: "repro", Run: "true"}}
+
+	errs := Validate(c)
+	if len(errs) == 0 {
+		t.Fatal("expected firecracker mode validation error")
 	}
 }

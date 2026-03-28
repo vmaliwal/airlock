@@ -53,11 +53,19 @@ func Validate(c Contract) []string {
 	if c.Backend.Kind == BackendFirecracker {
 		if c.Backend.FirecrackerHost == nil {
 			errs = append(errs, "backend.firecrackerHost is required for firecracker backend")
-		} else if c.Backend.FirecrackerHost.Mode == "ssh" {
-			if c.Backend.FirecrackerHost.Host == "" || c.Backend.FirecrackerHost.User == "" || c.Backend.FirecrackerHost.RemoteWorkDir == "" {
-				errs = append(errs, "firecracker ssh mode requires host, user, and remoteWorkDir")
+		} else {
+			if c.Backend.FirecrackerHost.Mode != "local" && c.Backend.FirecrackerHost.Mode != "ssh" {
+				errs = append(errs, "firecracker mode must be local or ssh")
+			}
+			if c.Backend.FirecrackerHost.Mode == "ssh" {
+				if c.Backend.FirecrackerHost.Host == "" || c.Backend.FirecrackerHost.User == "" || c.Backend.FirecrackerHost.RemoteWorkDir == "" {
+					errs = append(errs, "firecracker ssh mode requires host, user, and remoteWorkDir")
+				}
 			}
 		}
+	}
+	if len(c.Security.ExportPaths) == 0 {
+		errs = append(errs, "security.exportPaths is required")
 	}
 	for i, step := range c.Steps {
 		if step.Name == "" {

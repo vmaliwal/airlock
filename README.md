@@ -16,6 +16,10 @@ Backends:
 - `lima` — macOS local Linux VM backend via Lima / Virtualization.framework
 - `firecracker` — Linux/cloud backend via Firecracker host orchestration
 
+Current parity note:
+- Lima has the proven guest-binary path for `/tmp/airlock` and `/tmp/airlock-researchguest`
+- Firecracker now fails honestly when a contract requires guest binary injection that it cannot yet provide
+
 ## Why Go
 
 Airlock is an infra/security tool. Go gives us:
