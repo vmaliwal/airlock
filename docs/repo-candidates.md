@@ -136,3 +136,4 @@ Recommended next three:
   - `charmbracelet/gum` is another strong VM-routed Go candidate with a smaller/more tractable surface.
 - `langchain-ai/langchain` (`libs/core`) is now a validated success target for issue `#36297`.
 - `charmbracelet/gum` is now a validated success target for file height accounting in `file/file.go`.
+- `cli/cli` is now a validated success target for repo sync worktree-safety handling in `pkg/cmd/repo/sync`.

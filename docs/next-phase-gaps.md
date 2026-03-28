@@ -353,3 +353,7 @@ Use this section as an ongoing journal of gap discoveries and refinements.
   - Confirmed a new real repo success outside Beats and LangChain.
   - Learned that repo refs in contracts must be verified; `gum` required `main`, not `master`.
   - Confirmed command-first, test-added-in-setup remediation works cleanly for smaller Go OSS repos.
+- Ran full VM-backed research successfully on `cli/cli` for issue `#12927`-style worktree corruption in `gh repo sync`.
+  - Confirmed another large Go CLI repo can be handled cleanly through the same reproduce → patch → validate loop.
+  - Repo lesson: `git update-ref` on a branch checked out in another worktree is a real corruption hazard and should be blocked unless a worktree-aware path is implemented.
+  - Airlock workflow gap: authoring complex setup mutations as inline command strings is too brittle; patch-based or first-class file-mutation contract helpers would reduce contract failure modes.
