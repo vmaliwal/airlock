@@ -30,6 +30,7 @@ Requirements:
 - prepared kernel and rootfs
 - `airlock-firecracker-host.sh` available on the Linux runner host
 - SSH reachable host if orchestrated remotely
+- host shim interface as defined in `docs/firecracker-host-shim.md`
 
 Flow:
 1. upload payload bundle to Linux runner host
