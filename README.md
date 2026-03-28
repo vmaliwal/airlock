@@ -54,6 +54,7 @@ go test ./...
 ```bash
 ./airlock probe /path/to/repo-or-subdir
 ./airlock investigate /path/to/repo-or-subdir
+./airlock plan /path/to/repo-or-subdir
 ./airlock preflight /path/to/repo-or-subdir
 ```
 
@@ -94,12 +95,15 @@ Currently this auto-routing applies to:
 ./airlock autofix-run path/to/autofix.json
 ```
 
-Autofix plans can now use:
+Autofix/attempt mutations can now use:
 - `search_replace`
 - `insert_after`
 - `replace_line`
+- `create_file`
+- `apply_patch`
 
-And attempt ordering can be influenced by prior lessons plus optional `fingerprint_hints`.
+And planning/attempt ordering can be influenced by prior lessons plus optional `fingerprint_hints`.
+Set `AIRLOCK_LESSONS_ROOT=/path/to/lessons` to feed a broader lesson corpus into planning.
 
 ## Example run
 

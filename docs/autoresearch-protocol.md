@@ -62,6 +62,7 @@ All runs:
 Probe / classification:
 - `airlock probe <repo-path>`
 - `airlock investigate <repo-path>`
+- `airlock plan <repo-path>`
 - `airlock preflight <repo-path>`
 
 Important probe statuses:
@@ -94,10 +95,12 @@ Campaign flows:
 - `airlock campaign-validate <contract.json>`
 - `airlock campaign-run <contract.json>`
 
-Autofix learning:
+Autofix and planning learning:
 - attempt lessons are stored in `lessons.jsonl`
 - autofix ranking uses prior success/failure, mutation kind, and optional `fingerprint_hints`
-- this is the first step toward fingerprint-aware attempt ordering instead of static candidate order
+- `airlock plan` now ranks mutation families using repo-type defaults plus prior lessons
+- set `AIRLOCK_LESSONS_ROOT` to point planning at a broader lesson corpus
+- this is an early step toward fingerprint-aware planning instead of static candidate order
 
 Supported campaign inputs:
 - a single research contract with a top-level `campaign` section

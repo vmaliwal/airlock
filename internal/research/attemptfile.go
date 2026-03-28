@@ -26,10 +26,21 @@ type ReplaceLineMutation struct {
 	NewLine string `json:"newLine"`
 }
 
+type CreateFileMutation struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+type ApplyPatchMutation struct {
+	Patch string `json:"patch"`
+}
+
 type MutationSpec struct {
 	SearchReplace *SearchReplaceMutation `json:"search_replace,omitempty"`
 	InsertAfter   *InsertAfterMutation   `json:"insert_after,omitempty"`
 	ReplaceLine   *ReplaceLineMutation   `json:"replace_line,omitempty"`
+	CreateFile    *CreateFileMutation    `json:"create_file,omitempty"`
+	ApplyPatch    *ApplyPatchMutation    `json:"apply_patch,omitempty"`
 }
 
 type AttemptFile struct {
@@ -83,7 +94,7 @@ func ValidateAttemptFile(c AttemptFile) []string {
 	if c.Attempt.Validation.Command == "" {
 		errs = append(errs, "attempt.validation.command is required")
 	}
-	if c.Attempt.MutationCommand == "" && c.Mutation.SearchReplace == nil && c.Mutation.InsertAfter == nil && c.Mutation.ReplaceLine == nil {
+	if c.Attempt.MutationCommand == "" && c.Mutation.SearchReplace == nil && c.Mutation.InsertAfter == nil && c.Mutation.ReplaceLine == nil && c.Mutation.CreateFile == nil && c.Mutation.ApplyPatch == nil {
 		errs = append(errs, "attempt requires mutationCommand or supported mutation spec")
 	}
 	return errs
@@ -145,6 +156,30 @@ func ApplyMutationSpec(repo string, m MutationSpec) (CommandResult, error) {
 		}
 		return CommandResult{Command: "replace_line", ExitCode: 0}, nil
 	}
+	if m.CreateFile != nil {
+		path := filepath.Join(repo, m.CreateFile.Path)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return CommandResult{Command: "create_file", ExitCode: 1, Stderr: err.Error()}, nil
+		}
+		if err := os.WriteFile(path, []byte(m.CreateFile.Content), 0o644); err != nil {
+			return CommandResult{Command: "create_file", ExitCode: 1, Stderr: err.Error()}, nil
+		}
+		return CommandResult{Command: "create_file", ExitCode: 0}, nil
+	}
+	if m.ApplyPatch != nil {
+		patchPath := filepath.Join(repo, ".airlock-inline.patch")
+		if err := os.WriteFile(patchPath, []byte(m.ApplyPatch.Patch), 0o644); err != nil {
+			return CommandResult{Command: "apply_patch", ExitCode: 1, Stderr: err.Error()}, nil
+		}
+		res, err := RunLocalCommand(repo, "git apply .airlock-inline.patch", 30*time.Second)
+
+		_ = os.Remove(patchPath)
+		if err != nil {
+			return CommandResult{Command: "apply_patch", ExitCode: 1, Stderr: err.Error()}, nil
+		}
+		res.Command = "apply_patch"
+		return res, nil
+	}
 	return CommandResult{Command: "mutation", ExitCode: 1, Stderr: "no supported mutation spec provided"}, nil
 }
 
@@ -157,6 +192,12 @@ func MutationKind(m MutationSpec, attempt AttemptSpec) string {
 	}
 	if m.ReplaceLine != nil {
 		return "replace_line"
+	}
+	if m.CreateFile != nil {
+		return "create_file"
+	}
+	if m.ApplyPatch != nil {
+		return "apply_patch"
 	}
 	if attempt.MutationCommand != "" {
 		return "command"
@@ -178,7 +219,7 @@ func RunAttemptFile(c AttemptFile) (AttemptOutcome, error) {
 	}
 	attempt := c.Attempt
 	attempt.Timeout = 30 * time.Second
-	if c.Mutation.SearchReplace != nil || c.Mutation.InsertAfter != nil || c.Mutation.ReplaceLine != nil {
+	if c.Mutation.SearchReplace != nil || c.Mutation.InsertAfter != nil || c.Mutation.ReplaceLine != nil || c.Mutation.CreateFile != nil || c.Mutation.ApplyPatch != nil {
 		attempt.MutationCommand = ""
 	}
 	outcome, err := RunNativeAttemptWithMutation(c.Repo, c.ArtifactsDir, checkpoint, attempt, c.Mutation)
