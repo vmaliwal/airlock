@@ -153,12 +153,17 @@ func runInvestigate(path string) {
 	fmt.Println(toJSON(report))
 }
 
-func runPlan(path string) {
+func runPlan(arg string) {
 	backend := ""
 	if kind, err := selectAutoVMBackend(); err == nil {
 		backend = string(kind)
 	}
-	report, err := research.PlanRepo(path, backend, research.HostExecutionExceptionDeclared())
+	input, err := research.ResolvePlanInput(arg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	report, err := research.PlanFromInput(input, backend, research.HostExecutionExceptionDeclared())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

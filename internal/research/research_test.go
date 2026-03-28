@@ -112,3 +112,56 @@ func TestCompareGoVersions(t *testing.T) {
 		t.Fatal("expected 1.25.1 > 1.24.9")
 	}
 }
+
+func TestAssessRepoBootstrapNeededNode(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-node-bootstrap-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := os.WriteFile(filepath.Join(repo, "package.json"), []byte("{\"name\":\"example\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := DetectRepo(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assessment, err := AssessRepo(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assessment.Status != "bootstrap_needed_vm_preferred" {
+		t.Fatalf("unexpected assessment: %#v", assessment)
+	}
+}
+
+func TestAssessRepoPartialRunnableScope(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-partial-scope-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(repo, "apps", "web"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "apps", "web", "package.json"), []byte("{\"name\":\"web\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "apps", "web", "package-lock.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := DetectRepo(filepath.Join(repo, "apps", "web"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assessment, err := AssessRepo(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assessment.Status != "partial_runnable_scope" {
+		t.Fatalf("unexpected assessment: %#v", assessment)
+	}
+}

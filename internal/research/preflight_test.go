@@ -51,11 +51,29 @@ func TestPreflightRepoAllowsExplicitHostException(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, "package.json"), []byte("{\"name\":\"example\"}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(repo, "package-lock.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	decision, err := PreflightRepo(repo, "lima", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if decision.Route != "host" {
 		t.Fatalf("expected host route, got %#v", decision)
+	}
+}
+
+func TestPreflightRepoStopsForEnvConfigBlocked(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-preflight-env-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	decision, err := PreflightRepo(repo, "lima", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decision.Route != "stop" {
+		t.Fatalf("expected stop route, got %#v", decision)
 	}
 }

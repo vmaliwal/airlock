@@ -39,3 +39,26 @@ func TestPlanRepoUsesLessonRootAndRanksKinds(t *testing.T) {
 		t.Fatalf("expected apply_patch to rank first, got %#v", report.RankedMutationKinds)
 	}
 }
+
+func TestPlanFromInputCarriesBugSignal(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-plan-input-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := os.WriteFile(filepath.Join(repo, "package.json"), []byte("{\"name\":\"example\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report, err := PlanFromInput(PlanInput{
+		RepoPath:       repo,
+		IssueURL:       "https://github.com/example/repo/issues/1",
+		FailingCommand: "npm test -- broken",
+		FailureText:    "timeout exceeded",
+	}, "lima", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Input.IssueURL == "" || len(report.CandidateCommands) == 0 {
+		t.Fatalf("expected bug signal to carry into report: %#v", report)
+	}
+}

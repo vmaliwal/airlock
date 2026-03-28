@@ -66,9 +66,13 @@ Probe / classification:
 - `airlock preflight <repo-path>`
 
 Important probe statuses:
-- `ready`: host execution is viable
+- `ready`: repo is runnable with no immediate structural warning
 - `structurally_blocked`: missing source/bootstrap paths prevent an honest run
+- `monorepo_target_required`: root-level scope is too broad; choose a concrete package/module target
 - `host_toolchain_blocked_vm_runnable`: the host toolchain is too old, so local validation should stop and the repo should be routed into a VM-backed run instead
+- `bootstrap_needed_vm_preferred`: bootstrap/install setup is likely needed before honest execution
+- `partial_runnable_scope`: a concrete subdir/package scope is selected and should stay narrow
+- `env_config_blocked`: execution context is still underspecified
 
 Template scaffolding:
 - `airlock template research`
@@ -99,6 +103,7 @@ Autofix and planning learning:
 - attempt lessons are stored in `lessons.jsonl`
 - autofix ranking uses prior success/failure, mutation kind, and optional `fingerprint_hints`
 - `airlock plan` now ranks mutation families using repo-type defaults plus prior lessons
+- `airlock plan` accepts either a repo path or a JSON plan input carrying issue URL, failing command, and failure text
 - set `AIRLOCK_LESSONS_ROOT` to point planning at a broader lesson corpus
 - this is an early step toward fingerprint-aware planning instead of static candidate order
 

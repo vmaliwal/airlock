@@ -55,13 +55,18 @@ go test ./...
 ./airlock probe /path/to/repo-or-subdir
 ./airlock investigate /path/to/repo-or-subdir
 ./airlock plan /path/to/repo-or-subdir
+./airlock plan path/to/plan-input.json
 ./airlock preflight /path/to/repo-or-subdir
 ```
 
 Probe now distinguishes between:
-- `ready` — host execution is viable
+- `ready` — repo is runnable with no immediate structural warning
 - `structurally_blocked` — missing sources/bootstrap makes honest execution impossible
+- `monorepo_target_required` — repo root is too broad; choose a concrete package/module target
 - `host_toolchain_blocked_vm_runnable` — host execution should not proceed, but VM execution is still viable
+- `bootstrap_needed_vm_preferred` — bootstrap/install setup is likely needed before honest execution
+- `partial_runnable_scope` — a concrete subdir/package scope is selected and should stay scoped
+- `env_config_blocked` — execution context is still underspecified
 
 Host execution policy:
 - unknown repo code should not execute on the host by default

@@ -18,14 +18,17 @@ func DetectRepo(startPath string) (RepoProfile, error) {
 	repoRoot := detectRepoRoot(targetPath)
 	detectedFiles := detectFiles(repoRoot)
 	discoveredTargets := []string{}
+	bootstrapHints := []string{}
 	repoType := "unknown"
 	switch {
 	case contains(detectedFiles, "go.mod"):
 		repoType = "go"
 	case contains(detectedFiles, "package.json"):
 		repoType = "node"
+		bootstrapHints = nodeBootstrapHints(repoRoot)
 	case contains(detectedFiles, "pyproject.toml"):
 		repoType = "python"
+		bootstrapHints = pythonBootstrapHints(repoRoot)
 	case contains(detectedFiles, "Cargo.toml"):
 		repoType = "rust"
 	default:
@@ -39,6 +42,7 @@ func DetectRepo(startPath string) (RepoProfile, error) {
 		DetectedFiles:     detectedFiles,
 		DiscoveredTargets: discoveredTargets,
 		BaselineCommands:  baselineCommandsFor(repoType, repoRoot, targetPath),
+		BootstrapHints:    bootstrapHints,
 	}, nil
 }
 
@@ -109,6 +113,19 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 	} else if toolchainBlocked {
 		status = "host_toolchain_blocked_vm_runnable"
 		recommended = "vm"
+	} else if len(profile.BootstrapHints) > 0 {
+		status = "bootstrap_needed_vm_preferred"
+		recommended = "vm"
+		evidence = append(evidence, profile.BootstrapHints...)
+	} else if profile.RepoType == "unknown" && len(profile.DiscoveredTargets) == 0 {
+		status = "env_config_blocked"
+		recommended = "vm"
+		hostRunnable = false
+		evidence = append(evidence, "unknown repo type; concrete runtime/bootstrap context still missing")
+	} else if !samePath(profile.TargetPath, profile.RepoRoot) {
+		status = "partial_runnable_scope"
+		recommended = "vm"
+		evidence = append(evidence, "subdir-targeted scope detected")
 	}
 	return RepoAssessment{
 		Runnable:             hostRunnable,
@@ -125,7 +142,18 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 func detectRepoRoot(start string) string {
 	current := start
 	for {
-		if exists(filepath.Join(current, ".git")) || exists(filepath.Join(current, "go.mod")) || exists(filepath.Join(current, "package.json")) || exists(filepath.Join(current, "pyproject.toml")) || exists(filepath.Join(current, "Cargo.toml")) {
+		if exists(filepath.Join(current, ".git")) {
+			return current
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	current = start
+	for {
+		if exists(filepath.Join(current, "go.mod")) || exists(filepath.Join(current, "package.json")) || exists(filepath.Join(current, "pyproject.toml")) || exists(filepath.Join(current, "Cargo.toml")) {
 			return current
 		}
 		parent := filepath.Dir(current)
@@ -138,7 +166,7 @@ func detectRepoRoot(start string) string {
 
 func detectFiles(root string) []string {
 	files := []string{}
-	for _, name := range []string{"package.json", "go.mod", "pyproject.toml", "Cargo.toml"} {
+	for _, name := range []string{"package.json", "go.mod", "pyproject.toml", "Cargo.toml", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "requirements.txt", "poetry.lock", "uv.lock", "tox.ini", "docker-compose.yml", "compose.yml"} {
 		if exists(filepath.Join(root, name)) {
 			files = append(files, name)
 		}
@@ -276,4 +304,23 @@ func contains(items []string, v string) bool {
 		}
 	}
 	return false
+}
+
+func nodeBootstrapHints(root string) []string {
+	hints := []string{}
+	if !exists(filepath.Join(root, "package-lock.json")) && !exists(filepath.Join(root, "yarn.lock")) && !exists(filepath.Join(root, "pnpm-lock.yaml")) {
+		hints = append(hints, "node repo has no lockfile; bootstrap/install policy likely required before honest execution")
+	}
+	return hints
+}
+
+func pythonBootstrapHints(root string) []string {
+	hints := []string{}
+	if exists(filepath.Join(root, "pyproject.toml")) {
+		hints = append(hints, "python repo likely needs venv-first bootstrap")
+	}
+	if !exists(filepath.Join(root, "requirements.txt")) && !exists(filepath.Join(root, "poetry.lock")) && !exists(filepath.Join(root, "uv.lock")) {
+		hints = append(hints, "python dependency manifest may require project-specific bootstrap")
+	}
+	return hints
 }

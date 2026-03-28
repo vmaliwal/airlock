@@ -464,9 +464,12 @@ Use this section as an ongoing journal of gap discoveries and refinements.
 - Codified Priority 0: unknown repo code should not execute on host unless an explicit exception is declared.
 - Implemented explicit host-execution exception gate via `AIRLOCK_ALLOW_HOST_EXEC_EXCEPTION=1`.
 - Added first-class `investigate` and `plan` entrypoints.
+- `plan` now accepts either a repo path or structured JSON input carrying issue URL, failing command, and failure text.
 - Unified attempt/autofix host-vs-VM routing through shared preflight policy instead of ad hoc local checks.
 - Expanded typed mutation support with `create_file` and `apply_patch`.
 - Added lessons-aware mutation-family ranking in planning, with optional lesson corpus input via `AIRLOCK_LESSONS_ROOT`.
+- Expanded classification with `bootstrap_needed_vm_preferred`, `partial_runnable_scope`, and `env_config_blocked`.
+- Fixed a real probe issue: repo root detection now prefers the git root over the nearest nested manifest so subdir/package scope is preserved honestly.
 - Added host-toolchain-blocked-but-VM-runnable classification.
 - Added VM auto-routing for `attempt-run` and `autofix-run`.
 - Validated real VM-routed fixes on `litefunctions/portal`.

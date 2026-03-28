@@ -17,10 +17,12 @@ type MutationKindScore struct {
 }
 
 type PlanReport struct {
+	Input                PlanInput           `json:"input"`
 	Investigation        InvestigationReport `json:"investigation"`
 	RankedMutationKinds  []MutationKindScore `json:"rankedMutationKinds,omitempty"`
 	CandidateActionKinds []string            `json:"candidateActionKinds,omitempty"`
 	LessonsSearchRoots   []string            `json:"lessonsSearchRoots,omitempty"`
+	CandidateCommands    []string            `json:"candidateCommands,omitempty"`
 }
 
 type loadedLesson struct {
@@ -29,7 +31,11 @@ type loadedLesson struct {
 }
 
 func PlanRepo(path string, vmBackend string, allowHostExecution bool) (PlanReport, error) {
-	investigation, err := InvestigateRepo(path, vmBackend, allowHostExecution)
+	return PlanFromInput(PlanInput{RepoPath: path}, vmBackend, allowHostExecution)
+}
+
+func PlanFromInput(input PlanInput, vmBackend string, allowHostExecution bool) (PlanReport, error) {
+	investigation, err := InvestigateRepo(input.RepoPath, vmBackend, allowHostExecution)
 	if err != nil {
 		return PlanReport{}, err
 	}
@@ -37,11 +43,14 @@ func PlanRepo(path string, vmBackend string, allowHostExecution bool) (PlanRepor
 	lessons := loadLessonsFromRoots(roots)
 	ranked := rankMutationKinds(investigation.Profile, lessons)
 	actionKinds := candidateActionKinds(ranked)
+	candidateCommands := rankedCommands(input, investigation)
 	return PlanReport{
+		Input:                input,
 		Investigation:        investigation,
 		RankedMutationKinds:  ranked,
 		CandidateActionKinds: actionKinds,
 		LessonsSearchRoots:   roots,
+		CandidateCommands:    candidateCommands,
 	}, nil
 }
 
@@ -148,6 +157,22 @@ func candidateActionKinds(ranked []MutationKindScore) []string {
 		case "apply_patch", "search_replace", "replace_line", "insert_after", "create_file":
 			out = append(out, item.Kind)
 		}
+	}
+	return dedupeStrings(out)
+}
+
+func rankedCommands(input PlanInput, investigation InvestigationReport) []string {
+	out := []string{}
+	if input.FailingCommand != "" {
+		out = append(out, input.FailingCommand)
+	}
+	out = append(out, investigation.CandidateReproduction...)
+	out = append(out, investigation.CandidateValidation...)
+	if input.IssueURL != "" {
+		out = append(out, "issue_context="+input.IssueURL)
+	}
+	if input.FailureText != "" {
+		out = append(out, "failure_text_present")
 	}
 	return dedupeStrings(out)
 }
