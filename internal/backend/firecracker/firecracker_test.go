@@ -1,28 +1,39 @@
 package firecracker
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/vmaliwal/airlock/internal/contract"
 )
 
-func TestRunRejectsContractsRequiringGuestBinaries(t *testing.T) {
+func TestRequiredGuestBinaries(t *testing.T) {
 	var c contract.Contract
 	c.Backend.Kind = contract.BackendFirecracker
-	c.Backend.FirecrackerHost = &contract.FirecrackerHostConfig{Mode: "local"}
-	c.Sandbox.NamePrefix = "demo"
-	c.Sandbox.ArtifactsDir = "/tmp/demo"
-	c.Sandbox.CPU = 2
-	c.Sandbox.MemoryGiB = 4
-	c.Sandbox.DiskGiB = 10
-	c.Repo.CloneURL = "https://github.com/example/repo.git"
-	c.Security.Network = contract.NetworkDeny
-	c.Security.ExportPaths = []string{"/airlock/artifacts"}
-	c.Steps = []contract.Step{{Name: "guest", Run: "/tmp/airlock attempt-run /tmp/x.json"}}
+	c.Steps = []contract.Step{{Name: "guest", Run: "/tmp/airlock attempt-run /tmp/x.json && /tmp/airlock-researchguest payload"}}
+	specs := requiredGuestBinaries(c, "/tmp/work")
+	if len(specs) != 2 {
+		t.Fatalf("expected 2 guest binaries, got %#v", specs)
+	}
+	if specs[0].GuestPath != "/tmp/airlock-researchguest" || specs[1].GuestPath != "/tmp/airlock" {
+		t.Fatalf("unexpected guest paths: %#v", specs)
+	}
+}
 
-	_, err := Backend{}.Run(c)
-	if err == nil || !strings.Contains(err.Error(), "does not yet support guest binary injection") {
-		t.Fatalf("expected honest parity error, got %v", err)
+func TestCopyInArgs(t *testing.T) {
+	specs := []guestBinarySpec{{HostPath: "/tmp/work/airlock", GuestPath: "/tmp/airlock", Name: "airlock"}}
+	args := copyInArgs(specs)
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "--copy-in") || !strings.Contains(joined, "/tmp/work/airlock:/tmp/airlock") {
+		t.Fatalf("unexpected copy-in args: %#v", args)
+	}
+}
+
+func TestFirecrackerRemoteRunCommandIncludesCopyIn(t *testing.T) {
+	specs := []guestBinarySpec{{HostPath: filepath.Join("/remote/work", "airlock"), GuestPath: "/tmp/airlock", Name: "airlock"}}
+	cmd := firecrackerRemoteRunCommand("demo", "/remote/work", specs)
+	if !strings.Contains(cmd, "--copy-in") || !strings.Contains(cmd, "/remote/work/airlock:/tmp/airlock") {
+		t.Fatalf("unexpected remote command: %s", cmd)
 	}
 }

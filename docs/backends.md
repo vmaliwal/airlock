@@ -39,9 +39,10 @@ Flow:
 5. destroy microVM resources
 
 Current parity note:
-- Firecracker orchestration exists, but it does not yet have parity with the Lima guest-binary path
-- contracts requiring `/tmp/airlock` or `/tmp/airlock-researchguest` now fail explicitly instead of pretending support exists
-- full guest binary injection/copy parity is still an open gap
+- Firecracker orchestration now stages guest helper binaries when contracts reference `/tmp/airlock` or `/tmp/airlock-researchguest`
+- local mode passes explicit `--copy-in host:guest` mappings to `airlock-firecracker-host.sh`
+- ssh mode uploads helper binaries to the remote workdir and passes the same `--copy-in` mappings remotely
+- full parity still depends on the host shim implementing `--copy-in` correctly and on validated end-to-end Firecracker runs
 
 ## Why both exist
 

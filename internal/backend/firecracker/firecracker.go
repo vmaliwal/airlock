@@ -37,9 +37,6 @@ func (b Backend) CheckPrereqs() []string {
 }
 
 func (b Backend) Run(c contract.Contract) (backend.RunResult, error) {
-	if needsGuestBinaryInjection(c) {
-		return backend.RunResult{}, fmt.Errorf("firecracker backend does not yet support guest binary injection for /tmp/airlock or /tmp/airlock-researchguest steps")
-	}
 	fc := c.Backend.FirecrackerHost
 	if fc == nil {
 		return backend.RunResult{}, fmt.Errorf("missing firecracker host config")
@@ -60,12 +57,18 @@ func (b Backend) Run(c contract.Contract) (backend.RunResult, error) {
 	if err := util.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 		return backend.RunResult{}, err
 	}
+	guestBinaries, err := buildRequiredGuestBinaries(c, workDir)
+	if err != nil {
+		return backend.RunResult{}, err
+	}
 
 	if fc.Mode == "local" {
 		if !util.CommandExists("airlock-firecracker-host.sh") {
 			return backend.RunResult{}, fmt.Errorf("airlock-firecracker-host.sh not found on PATH")
 		}
-		if _, err := util.RunLocal("airlock-firecracker-host.sh", []string{"run", "--name", sandboxName, "--contract", scriptPath, "--artifacts", c.Sandbox.ArtifactsDir}, util.RunOptions{}); err != nil {
+		args := []string{"run", "--name", sandboxName, "--contract", scriptPath, "--artifacts", c.Sandbox.ArtifactsDir}
+		args = append(args, copyInArgs(guestBinaries)...)
+		if _, err := util.RunLocal("airlock-firecracker-host.sh", args, util.RunOptions{}); err != nil {
 			return backend.RunResult{}, err
 		}
 		return backend.RunResult{SummaryPath: filepath.Join(c.Sandbox.ArtifactsDir, sandboxName+"-summary.json")}, nil
@@ -80,7 +83,13 @@ func (b Backend) Run(c contract.Contract) (backend.RunResult, error) {
 	if _, err := util.RunLocal("scp", append(scpBaseArgs(fc), scriptPath, sshTarget+":"+remoteDir+"/guest-run.sh"), util.RunOptions{}); err != nil {
 		return backend.RunResult{}, fmt.Errorf("upload guest script: %w", err)
 	}
-	remoteCmd := fmt.Sprintf("cd %s && airlock-firecracker-host.sh run --name %s --contract %s/guest-run.sh --artifacts %s", shell(remoteDir), shell(sandboxName), shell(remoteDir), shell(remoteDir))
+	for _, spec := range guestBinaries {
+		remotePath := remoteDir + "/" + filepath.Base(spec.HostPath)
+		if _, err := util.RunLocal("scp", append(scpBaseArgs(fc), spec.HostPath, sshTarget+":"+remotePath), util.RunOptions{}); err != nil {
+			return backend.RunResult{}, fmt.Errorf("upload guest binary %s: %w", spec.Name, err)
+		}
+	}
+	remoteCmd := fmt.Sprintf("cd %s && %s", shell(remoteDir), firecrackerRemoteRunCommand(sandboxName, remoteDir, guestBinaries))
 	if _, err := util.RunLocal("ssh", append(sshArgs, sshTarget, remoteCmd), util.RunOptions{}); err != nil {
 		return backend.RunResult{}, fmt.Errorf("run remote firecracker host shim: %w", err)
 	}
@@ -117,11 +126,14 @@ func shell(s string) string {
 	return "'" + s + "'"
 }
 
-func needsGuestBinaryInjection(c contract.Contract) bool {
-	for _, step := range c.Steps {
-		if strings.Contains(step.Run, "/tmp/airlock") || strings.Contains(step.Run, "/tmp/airlock-researchguest") {
-			return true
-		}
+func firecrackerRemoteRunCommand(sandboxName, remoteDir string, specs []guestBinarySpec) string {
+	parts := []string{"airlock-firecracker-host.sh", "run", "--name", shell(sandboxName), "--contract", shell(remoteDir + "/guest-run.sh"), "--artifacts", shell(remoteDir)}
+	for _, spec := range specs {
+		parts = append(parts, "--copy-in", shell(remoteDir+"/"+filepath.Base(spec.HostPath)+":"+spec.GuestPath))
 	}
-	return false
+	return joinShell(parts)
+}
+
+func joinShell(parts []string) string {
+	return strings.Join(parts, " ")
 }
