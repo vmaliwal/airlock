@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/vmaliwal/airlock/internal/contract"
 	"github.com/vmaliwal/airlock/internal/research"
@@ -59,6 +60,22 @@ func main() {
 			out = os.Args[3]
 		}
 		runSynthesize(os.Args[2], out)
+	case "eval-planner":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: airlock eval-planner <cases.json> [output.json]")
+			os.Exit(1)
+		}
+		out := ""
+		if len(os.Args) >= 4 {
+			out = os.Args[3]
+		}
+		runEvalPlanner(os.Args[2], out)
+	case "fix":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: airlock fix <github-issue-url>")
+			os.Exit(1)
+		}
+		runFix(os.Args[2])
 	case "preflight":
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "usage: airlock preflight <repo-path>")
@@ -126,7 +143,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Println("usage: airlock <check|probe|investigate|plan|intake-compile|synthesize|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
+	fmt.Println("usage: airlock <check|probe|investigate|plan|intake-compile|synthesize|eval-planner|fix|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
 }
 
 func runCheck() {
@@ -264,6 +281,137 @@ func runSynthesize(arg, out string) {
 		os.Exit(1)
 	}
 	fmt.Println(toJSON(map[string]any{"output": out, "supported": report.Supported, "attempts": len(report.Attempts)}))
+}
+
+func runEvalPlanner(path, out string) {
+	backend := ""
+	if kind, err := selectAutoVMBackend(); err == nil {
+		backend = string(kind)
+	}
+	cases, err := research.LoadPlannerEvalCases(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	summary, err := research.RunPlannerEvalCases(cases, backend, research.HostExecutionExceptionDeclared())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if out == "" {
+		fmt.Println(toJSON(summary))
+		return
+	}
+	data, _ := json.MarshalIndent(summary, "", "  ")
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := os.WriteFile(out, data, 0o644); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println(toJSON(map[string]any{"output": out, "cases": summary.CaseCount}))
+}
+
+func runFix(issueURL string) {
+	progress := func(stage, msg string, done bool, detail string) {
+		status := "→"
+		if done {
+			status = "✓"
+		}
+		if detail != "" {
+			fmt.Fprintf(os.Stderr, "%s %s... %s (%s)\n", status, stage, msg, detail)
+			return
+		}
+		fmt.Fprintf(os.Stderr, "%s %s... %s\n", status, stage, msg)
+	}
+	start := time.Now()
+	progress("Resolve issue", issueURL, false, "")
+	issue, err := research.ResolveGitHubIssue(issueURL)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	progress("Resolve issue", issue.Title, true, fmt.Sprintf("%s/%s#%d", issue.Owner, issue.Repo, issue.Number))
+	progress("Clone repo", issue.CloneURL, false, "")
+	repoPath, err := research.CloneIssueRepo(issue)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	progress("Clone repo", repoPath, true, "")
+	input := research.BuildPlanInputFromIssue(issue, repoPath)
+	backend := ""
+	if kind, err := selectAutoVMBackend(); err == nil {
+		backend = string(kind)
+		progress("Route to VM", string(kind), true, "")
+	}
+	result := research.FixResult{Issue: issue, RepoPath: repoPath, PlanInput: input}
+	progress("Reproduce bug", input.FailingCommand, false, "readonly VM run")
+	if input.FailingCommand != "" {
+		rc, err := research.CompilePlanInputToRunContract(input, backend, research.HostExecutionExceptionDeclared())
+		if err == nil {
+			compiled, cerr := research.CompileRunContract(rc)
+			if cerr == nil {
+				summaryPath, rerr := research.ExecuteCompiledContract(compiled)
+				if rerr == nil {
+					result.ReadonlySummaryPath = summaryPath
+					if repro, ok := research.ReadSiblingArtifact(summaryPath, "reproduction-results.json"); ok {
+						result.ReproductionResults = repro
+						progress("Reproduce bug", "completed", true, fmt.Sprintf("repro_status=%v", repro["repro_status"]))
+					} else {
+						progress("Reproduce bug", "completed", true, summaryPath)
+					}
+				} else {
+					progress("Reproduce bug", "failed", true, rerr.Error())
+				}
+			}
+		}
+	} else {
+		progress("Reproduce bug", "skipped", true, "no failing command inferred from issue")
+	}
+	progress("Generate candidates", "synthesizing", false, "")
+	synth, err := research.SynthesizeAutofixPlan(input, backend, research.HostExecutionExceptionDeclared())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	result.Synthesis = synth
+	progress("Generate candidates", fmt.Sprintf("%d attempts", len(synth.Attempts)), true, synth.Summary)
+	if synth.AutofixPlan == nil {
+		fmt.Println(toJSON(result))
+		return
+	}
+	progress("Attempt execution", fmt.Sprintf("running %d attempts", len(synth.AutofixPlan.Attempts)), false, "vm contract")
+	policy, handled := decideExecutionPolicy(synth.AutofixPlan.Repo)
+	if handled && policy.Preflight.Route == "vm" {
+		compiled, err := research.CompileAutofixPlanToVMContract(*synth.AutofixPlan, policy.BackendKind)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		summaryPath, err := executeBaseContract(compiled)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		result.AutofixContractSummary = summaryPath
+		if autofixResult, ok := research.ReadSiblingArtifact(summaryPath, "autofix-result.json"); ok {
+			result.AutofixResult = autofixResult
+		}
+		progress("Attempt execution", "completed", true, summaryPath)
+	} else {
+		summaryPath, err := research.RunAutofixPlan(*synth.AutofixPlan)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		result.AutofixContractSummary = summaryPath
+		progress("Attempt execution", "completed", true, summaryPath)
+	}
+	progress("Done", "finished", true, time.Since(start).Round(time.Second).String())
+	fmt.Println(toJSON(result))
 }
 
 func runPreflight(path string) {

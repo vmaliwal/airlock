@@ -51,7 +51,14 @@ go install github.com/vmaliwal/airlock/cmd/airlock@latest
 ```
 
 Optional convenience install path:
-- a simple `install.sh`/release-binary installer should exist for users who do not want a Go toolchain locally
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vmaliwal/airlock/main/install.sh | bash
+```
+
+Notes:
+- the installer prefers GitHub release binaries when available
+- if no release binary is available yet, it falls back to `go install` when a Go toolchain exists
 - Homebrew is intentionally not the current distribution path
 
 ## Build
@@ -83,6 +90,8 @@ go test ./...
 ./airlock intake-compile path/to/plan-input.json /tmp/issue-readonly.json
 ./airlock synthesize path/to/plan-input.json
 ./airlock synthesize path/to/plan-input.json /tmp/issue-autofix.json
+./airlock eval-planner path/to/cases.json
+./airlock fix https://github.com/owner/repo/issues/123
 ./airlock preflight /path/to/repo-or-subdir
 ```
 
@@ -99,11 +108,20 @@ go test ./...
 - this removes the old need to hand-author a starting research contract in the common local-intake case
 
 `synthesize` is the first autonomy bridge for repair generation:
-- by default it uses built-in narrow synthesis heuristics for supported bug classes
-- it can now also use a planner-backed structured synthesis path when configured with:
+- by default it uses built-in structured synthesis heuristics for supported bug classes
+- current validated heuristic classes now include:
+  - Python EOF/unclosed-block preservation
+  - Python empty-string optional-content guard tightening
+  - Go expected/got normalization mismatches
+- it can also use a planner-backed structured synthesis path when configured with:
   - `AIRLOCK_PLANNER_PROVIDER=anthropic`
   - `ANTHROPIC_API_KEY=...`
   - optional: `AIRLOCK_PLANNER_MODEL=claude-sonnet-4-5`
+- planner-backed synthesis now uses improved file/context narrowing:
+  - failure/failing-command token scoring
+  - symbol extraction
+  - path scoring
+  - simple source/test pairing
 - planner-backed synthesis still returns bounded native Airlock mutation attempts, not arbitrary patch blobs
 - the output can go straight into `autofix-run`
 - current honest positioning remains: supported-class autonomous candidate-fix generation, not broad autonomous bug fixing yet
@@ -148,6 +166,35 @@ Currently this auto-routing applies to:
 ```bash
 ./airlock autofix-run path/to/autofix.json
 ```
+
+## Run planner evals
+
+```bash
+./airlock eval-planner path/to/cases.json
+./airlock eval-planner path/to/cases.json /tmp/planner-eval-summary.json
+```
+
+`eval-planner` is the first machine-readable planner quality harness.
+It measures things like:
+- supported-case rate
+- schema-valid attempt rate
+- top-1 / top-3 mutation-kind hits when expectations are provided
+- optional local autofix execution on trusted/local eval fixtures
+
+## Run the top-level issue flow
+
+```bash
+./airlock fix https://github.com/owner/repo/issues/123
+```
+
+Current `fix` behavior:
+- resolves a public GitHub issue
+- clones the repo locally for inspection/planning
+- infers a failing command when possible from the issue body
+- performs a read-only VM reproduction run when a command is available
+- synthesizes candidate fixes
+- executes autofix attempts through the VM-backed path when policy requires it
+- prints visible progress and a final JSON result artifact
 
 Autofix/attempt mutations can now use:
 - `search_replace`

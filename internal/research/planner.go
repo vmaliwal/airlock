@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -109,13 +110,14 @@ func collectPlannerFileContext(root string, input PlanInput) []PlannerFileContex
 	if root == "" {
 		return nil
 	}
-	tokens := plannerSearchTokens(input.FailureText + "\n" + input.Notes)
+	tokens := plannerSearchTokens(input.FailureText + "\n" + input.Notes + "\n" + input.FailingCommand)
 	type scoredFile struct {
 		path    string
 		snippet string
 		score   int
 	}
 	scored := []scoredFile{}
+	seen := map[string]struct{}{}
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info == nil || info.IsDir() {
 			return nil
@@ -128,18 +130,20 @@ func collectPlannerFileContext(root string, input PlanInput) []PlannerFileContex
 			return nil
 		}
 		content := string(data)
-		score, snippet := scorePlannerFile(content, tokens)
-		if score == 0 && len(scored) >= 12 {
-			return nil
-		}
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+		score, snippet := scorePlannerFile(rel, content, tokens)
+		if score == 0 && len(scored) >= 16 {
 			return nil
 		}
 		if snippet == "" {
 			snippet = firstPlannerSnippet(content)
 		}
-		scored = append(scored, scoredFile{path: filepath.ToSlash(rel), snippet: snippet, score: score})
+		scored = append(scored, scoredFile{path: rel, snippet: snippet, score: score})
+		seen[rel] = struct{}{}
 		return nil
 	})
 	sort.SliceStable(scored, func(i, j int) bool {
@@ -149,19 +153,40 @@ func collectPlannerFileContext(root string, input PlanInput) []PlannerFileContex
 		return scored[i].score > scored[j].score
 	})
 	out := []PlannerFileContext{}
+	add := func(path string, score int) {
+		if _, ok := seen[path]; !ok {
+			return
+		}
+		for _, existing := range out {
+			if existing.Path == path {
+				return
+			}
+		}
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			return
+		}
+		out = append(out, PlannerFileContext{Path: path, Snippet: firstPlannerSnippet(string(data)), Score: score})
+	}
 	for _, item := range scored {
 		if len(out) >= 6 {
 			break
 		}
 		out = append(out, PlannerFileContext{Path: item.path, Snippet: item.snippet, Score: item.score})
+		for _, paired := range pairedPlannerPaths(item.path) {
+			add(paired, item.score-1)
+			if len(out) >= 6 {
+				break
+			}
+		}
 	}
 	return out
 }
 
 func plannerSearchTokens(s string) []string {
 	replacer := strings.NewReplacer("\n", " ", "\t", " ", "(", " ", ")", " ", ":", " ", ",", " ", ".", " ", "\"", " ", "'", " ", "`", " ", "[", " ", "]", " ", "{", " ", "}", " ", "=", " ", "/", " ")
-	s = strings.ToLower(replacer.Replace(s))
-	parts := strings.Fields(s)
+	s = replacer.Replace(s)
+	parts := strings.Fields(strings.ToLower(s))
 	out := []string{}
 	for _, p := range parts {
 		if len(p) < 4 {
@@ -171,6 +196,12 @@ func plannerSearchTokens(s string) []string {
 			continue
 		}
 		out = append(out, p)
+	}
+	symbolRE := regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]{2,}`)
+	for _, sym := range symbolRE.FindAllString(s, -1) {
+		if len(sym) >= 4 {
+			out = append(out, strings.ToLower(sym), sym)
+		}
 	}
 	return dedupeStrings(out)
 }
@@ -184,36 +215,54 @@ func isPlannerSourceFile(path string) bool {
 	return false
 }
 
-func scorePlannerFile(content string, tokens []string) (int, string) {
+func scorePlannerFile(path, content string, tokens []string) (int, string) {
 	lower := strings.ToLower(content)
+	lowerPath := strings.ToLower(path)
 	bestIdx := -1
 	score := 0
 	for _, token := range tokens {
-		idx := strings.Index(lower, token)
+		idx := strings.Index(lower, strings.ToLower(token))
 		if idx >= 0 {
-			score++
+			score += 2
 			if bestIdx == -1 || idx < bestIdx {
 				bestIdx = idx
 			}
+		}
+		if strings.Contains(lowerPath, strings.ToLower(token)) {
+			score += 1
 		}
 	}
 	if bestIdx == -1 {
 		return score, ""
 	}
-	start := bestIdx - 180
+	start := bestIdx - 220
 	if start < 0 {
 		start = 0
 	}
-	end := bestIdx + 380
+	end := bestIdx + 520
 	if end > len(content) {
 		end = len(content)
 	}
 	return score, strings.TrimSpace(content[start:end])
 }
 
+func pairedPlannerPaths(path string) []string {
+	out := []string{}
+	if strings.HasSuffix(path, "_test.go") {
+		out = append(out, strings.TrimSuffix(path, "_test.go")+".go")
+	}
+	if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+		out = append(out, strings.TrimSuffix(path, ".go")+"_test.go")
+	}
+	if strings.Contains(path, "/tests/") {
+		out = append(out, strings.Replace(path, "/tests/", "/", 1))
+	}
+	return dedupeStrings(out)
+}
+
 func firstPlannerSnippet(content string) string {
-	if len(content) > 500 {
-		content = content[:500]
+	if len(content) > 700 {
+		content = content[:700]
 	}
 	return strings.TrimSpace(content)
 }

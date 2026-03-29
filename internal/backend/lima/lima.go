@@ -93,7 +93,7 @@ func (b Backend) Run(c contract.Contract) (backend.RunResult, error) {
 	_, _ = util.RunLocal("limactl", []string{"copy", sandboxName + ":/tmp/airlock-artifacts.tgz", hostTarball}, util.RunOptions{})
 
 	// copy common artifacts if present
-	for _, name := range []string{"repo.patch", "steps.json", "outcome.md", "reproduction-results.json", "validation-results.json", "baseline-results.json", "campaign-baseline.json", "attempt-log.jsonl"} {
+	for _, name := range []string{"repo.patch", "steps.json", "outcome.md", "reproduction-results.json", "validation-results.json", "baseline-results.json", "campaign-baseline.json", "attempt-log.jsonl", "autofix-result.json", "autofix-summary.json", "proof-state.json"} {
 		hostPath := filepath.Join(c.Sandbox.ArtifactsDir, sandboxName+"-"+name)
 		_, _ = util.RunLocal("limactl", []string{"copy", sandboxName + ":/airlock/artifacts/" + name, hostPath}, util.RunOptions{})
 	}

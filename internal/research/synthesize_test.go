@@ -39,6 +39,32 @@ func TestSynthesizeAutofixPlanUnclosedCodeBlock(t *testing.T) {
 	}
 }
 
+func TestSynthesizeAutofixPlanGoExpectedGotNormalization(t *testing.T) {
+	repo := t.TempDir()
+	if err := InitTempGitRepo(repo, map[string]string{
+		"go.mod":          "module example.com/beats\n\ngo 1.23\n",
+		"version.go":      "package beats\n\nfunc alias() string {\n\treturn \"V4_0_0_0\"\n}\n",
+		"version_test.go": "package beats\n",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := util.RunLocal("git", []string{"remote", "add", "origin", "git@github.com:example/beats.git"}, util.RunOptions{Cwd: repo}); err != nil {
+		t.Fatal(err)
+	}
+	input := PlanInput{RepoPath: repo, FailureText: "expected V4_1_0_0, got V4_0_0_0", FailingCommand: "go test ./... -run TestKafkaAlias -count=1"}
+	report, err := SynthesizeAutofixPlan(input, "lima", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Supported || len(report.Attempts) == 0 {
+		t.Fatalf("expected synthesized go attempt, got %#v", report)
+	}
+	m := report.Attempts[0].Attempt.Mutation.ReplaceLine
+	if m == nil || m.NewLine != "\treturn \"V4_1_0_0\"" {
+		t.Fatalf("expected go replace-line attempt, got %#v", report.Attempts[0])
+	}
+}
+
 func TestSynthesizeAutofixPlanEmptyReasoningContent(t *testing.T) {
 	repo := t.TempDir()
 	if err := InitTempGitRepo(repo, map[string]string{

@@ -74,11 +74,15 @@ Recent product/backlog progress since the baseline snapshot:
 - this materially improves the top-level operator path:
   - `plan-input.json` -> `airlock intake-compile ...` -> `research-validate|research-run`
 - autonomy work has now started in-product:
-  - `airlock synthesize ...` can emit structured autofix attempts for a narrow set of supported bug classes
-  - `airlock synthesize` now also supports an optional planner-backed structured synthesis path via the official Anthropic Go SDK when configured with planner env vars
+  - `airlock synthesize ...` can emit structured autofix attempts for supported bug classes
+  - `airlock synthesize` supports an optional planner-backed structured synthesis path via the official Anthropic Go SDK when configured with planner env vars
+  - planner context narrowing is now stronger via failure/failing-command token scoring, symbol extraction, and source/test pairing
+  - `airlock eval-planner ...` now exists as a first machine-readable planner eval harness
+  - `airlock fix <github-issue-url>` now exists as a first top-level visible operator path
 
 Open high-value product gaps still shaping the next phase:
 - `AIR-009` planner-backed autonomous attempt synthesis is still too narrow
+- `AIR-010` top-level issue UX exists, but is still early and operator-incomplete
 - `AIR-002` brittle inline setup shell
 - `AIR-004` host toolchain policy clarity
 - `AIR-001` Firecracker end-to-end validation
@@ -117,6 +121,7 @@ Required slices:
      - relevant snippets
      - safety constraints
    - support schema-constrained output into structured attempts
+   - status: first implementation shipped
 2. **Synthesis widening**
    - expand beyond current heuristic Python examples
    - first targets:
@@ -128,6 +133,7 @@ Required slices:
    - schema-valid attempt rate
    - success rate by bug class
    - benchmark against proven repos/issues already validated in Airlock
+   - status: first `eval-planner` harness shipped; corpus breadth still needs work
 4. **End-to-end operator path**
    - smooth `synthesize -> autofix-run -> proof-state -> PR summary` flow
    - reduce unsupported-class fallthrough confusion
@@ -135,10 +141,12 @@ Required slices:
    - build toward `airlock fix <github-issue-url>` as the default product entry point
    - show visible progress across resolve, clone, repro, synthesis, attempts, proof, and PR/output steps
    - keep lower-level JSON/contracts as internal artifacts and advanced escape hatches
+   - status: first `airlock fix <github-issue-url>` implementation shipped
 6. **Install and distribution**
    - primary install path: `go install github.com/vmaliwal/airlock/cmd/airlock@latest`
    - optional convenience path: `install.sh` / release-binary installer
    - explicitly skip Homebrew for now
+   - status: first `install.sh` convenience path shipped
 7. **Honest messaging**
    - describe current state as autonomous candidate-fix generation for supported classes
    - do not claim broad autonomous bug fixing until planner coverage and evals justify it

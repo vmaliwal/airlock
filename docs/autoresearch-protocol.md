@@ -65,6 +65,8 @@ Probe / classification:
 - `airlock plan <repo-path|plan-input.json>`
 - `airlock intake-compile <repo-path|plan-input.json> [output.json]`
 - `airlock synthesize <repo-path|plan-input.json> [output.json]`
+- `airlock eval-planner <cases.json> [output.json]`
+- `airlock fix <github-issue-url>`
 - `airlock preflight <repo-path>`
 
 Important probe statuses:
@@ -119,18 +121,36 @@ Autofix and planning learning:
 - autofix ranking uses prior success/failure, mutation kind, and optional `fingerprint_hints`
 - `airlock synthesize` now begins the autonomous candidate-fix path for supported bug classes by emitting structured mutation attempts into an autofix plan
 - it now has two synthesis modes:
-  - built-in heuristic synthesis for validated narrow bug classes
+  - built-in heuristic synthesis for validated supported bug classes
   - optional planner-backed structured synthesis when configured with:
     - `AIRLOCK_PLANNER_PROVIDER=anthropic`
     - `ANTHROPIC_API_KEY=...`
     - optional `AIRLOCK_PLANNER_MODEL`
+- planner-backed synthesis now narrows context using:
+  - failure/failing-command token scoring
+  - symbol extraction
+  - path-aware ranking
+  - simple source/test pairing
 - planner-backed synthesis still normalizes all model output into bounded Airlock mutation attempts before execution
 - currently validated synthesis examples include:
-  - unclosed code-block EOF preservation
-  - empty-string guard tightening for optional reasoning content
+  - Python unclosed code-block EOF preservation
+  - Python empty-string guard tightening for optional reasoning content
+  - Go expected/got normalization mismatch repair
+- `airlock eval-planner` now provides a first machine-readable planner quality harness for:
+  - supported-case rate
+  - schema-valid attempt rate
+  - top-1 / top-3 mutation-kind hits
+  - optional trusted/local autofix execution on eval fixtures
+- `airlock fix <github-issue-url>` now exists as the first top-level visible operator path:
+  - resolve issue
+  - clone repo
+  - attempt readonly reproduction when a command can be inferred
+  - synthesize bounded attempts
+  - run autofix
+  - return artifacts and visible progress
 - this is the first step toward the intended planner loop:
   - repro/fingerprint/context -> candidate attempts -> autofix execution -> proof state
-- the next planned slice is planner-backed synthesis widening plus top-N planner evals
+- the next planned slice is broader planner eval coverage and more real OSS validation through `airlock fix`
 - `airlock plan` now ranks mutation families using:
   - repo-type defaults
   - failure-text-derived fingerprint hints

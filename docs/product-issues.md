@@ -407,15 +407,19 @@ Use the narrow heuristic synthesis path where supported, or hand-author attempts
 A first provider-backed implementation now exists behind `airlock synthesize` when configured with `AIRLOCK_PLANNER_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`.
 It packages investigation context, candidate file snippets, and allowed mutation kinds into a structured planner call, then normalizes the response back into native Airlock `AttemptFile` mutations.
 
+Additional progress now shipped:
+- first planner eval harness via `airlock eval-planner`
+- stronger planner file/context narrowing via token scoring, symbol extraction, path-aware ranking, and simple source/test pairing
+- broader validated heuristic coverage including a Go expected/got normalization class
+
 This remains in progress because the product still needs:
-- top-N planner evals
+- broader eval corpus and top-N proof across more real repos
 - broader bug-class coverage
-- better planner file/context narrowing
 - stronger reviewer-facing PR summary output
 - more evidence across real OSS repos
 
 ## AIR-010 — Top-level UX is still too operator-heavy
-- Status: `planned`
+- Status: `in_progress`
 - Severity: `sev1`
 - Type: `ux`
 - First seen: `2026-03-29`
@@ -440,10 +444,18 @@ Airlock should provide a top-level command like:
 that performs intake, routing, repro, synthesis, attempt execution, proof capture, and PR/output preparation with clear progress stages.
 
 ### Current workaround
-Use the lower-level command ladder directly.
+Use the lower-level command ladder directly, or the early `airlock fix <github-issue-url>` path for public GitHub issues.
 
 ### Notes
-This should ship with simple distribution too:
-- primary install via `go install github.com/vmaliwal/airlock/cmd/airlock@latest`
-- optional convenience installer via `install.sh` / release binaries
-- explicitly no Homebrew path for now
+A first implementation now exists:
+- `airlock fix <github-issue-url>` resolves the issue, clones the repo, attempts readonly reproduction when it can infer a command, synthesizes candidate fixes, executes autofix, and prints visible progress
+
+This issue remains open because it still needs:
+- tighter repro inference from issue content
+- stronger PR/draft-output generation
+- richer progress/proof presentation
+- more coverage across real repos
+- simple distribution via:
+  - primary install `go install github.com/vmaliwal/airlock/cmd/airlock@latest`
+  - optional convenience installer `install.sh`
+  - explicitly no Homebrew path for now

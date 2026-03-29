@@ -72,12 +72,35 @@ func SynthesizeAutofixPlan(input PlanInput, vmBackend string, allowHostExecution
 }
 
 func synthesizeAttemptsForInput(input PlanInput, profile RepoProfile, validationCmd string) ([]SynthesizedAttempt, string) {
+	if profile.RepoType == "go" {
+		if attempts := synthesizeGoAttempts(input, profile, validationCmd); len(attempts) > 0 {
+			return attempts, "generated candidate attempts for a supported Go bug-class heuristic"
+		}
+	}
 	if profile.RepoType == "python" {
 		if attempts := synthesizePythonAttempts(input, profile, validationCmd); len(attempts) > 0 {
 			return attempts, "generated candidate attempts for a supported Python bug-class heuristic"
 		}
 	}
 	return nil, "no supported structured synthesis heuristic matched this bug signal yet"
+}
+
+func synthesizeGoAttempts(input PlanInput, profile RepoProfile, validationCmd string) []SynthesizedAttempt {
+	failure := input.FailureText + "\n" + input.Notes
+	attempts := []SynthesizedAttempt{}
+	expected, got, ok := parseExpectedGotPair(failure)
+	if ok {
+		if rel, line, found := findFileLineContaining(profile.TargetPath, got); found {
+			attempts = append(attempts, SynthesizedAttempt{
+				Name:         "normalize mismatched expected value",
+				MutationKind: "replace_line",
+				Confidence:   "medium",
+				Rationale:    "failure text provides an expected/got pair and the target repo contains the observed value on a bounded line",
+				Attempt:      AttemptFile{Attempt: AttemptSpec{Name: "normalize-mismatched-expected-value", CommitMessage: "attempt: normalize mismatched expected value", Validation: Phase{Command: validationCmd, Repeat: 1, Success: SuccessRule{ExitCode: pintCompiled(0), MinPassRate: pfloatCompiled(1.0), MaxFailures: pintCompiled(0)}}, Safety: SafetyBudget{MaxFilesChanged: 1, MaxLocChanged: 10, AllowedPaths: []string{rel}}}, Mutation: MutationSpec{ReplaceLine: &ReplaceLineMutation{Path: rel, OldLine: line, NewLine: strings.Replace(line, got, expected, 1)}}},
+			})
+		}
+	}
+	return attempts
 }
 
 func synthesizePythonAttempts(input PlanInput, profile RepoProfile, validationCmd string) []SynthesizedAttempt {

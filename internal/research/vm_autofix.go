@@ -65,7 +65,14 @@ func CompileAutofixPlanToVMContract(plan AutofixPlan, backendKind base.BackendKi
 	if err != nil {
 		return base.Contract{}, err
 	}
-	stepCommand := fmt.Sprintf("%s cat <<'EOF' | base64 -d > /tmp/airlock-autofix.json\n%s\nEOF\nchmod +x /tmp/airlock\n/tmp/airlock autofix-run /tmp/airlock-autofix.json", toolchainBootstrapSnippet(plan.Repo), base64.StdEncoding.EncodeToString(payload))
+	stepCommand := fmt.Sprintf(`%s cat <<'EOF' | base64 -d > /tmp/airlock-autofix.json
+%s
+EOF
+chmod +x /tmp/airlock
+summary_json=$(/tmp/airlock autofix-run /tmp/airlock-autofix.json)
+echo "$summary_json" > /airlock/artifacts/autofix-result.json
+summary_path=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("summaryPath",""))' <<<"$summary_json")
+if [ -n "$summary_path" ] && [ -f "$summary_path" ]; then cp "$summary_path" /airlock/artifacts/autofix-summary.json; fi`, toolchainBootstrapSnippet(plan.Repo), base64.StdEncoding.EncodeToString(payload))
 	var c base.Contract
 	c.Backend.Kind = backendKind
 	c.Sandbox.NamePrefix = "autofix"
