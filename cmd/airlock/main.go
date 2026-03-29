@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/vmaliwal/airlock/internal/contract"
@@ -34,10 +35,20 @@ func main() {
 		runInvestigate(os.Args[2])
 	case "plan":
 		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "usage: airlock plan <repo-path>")
+			fmt.Fprintln(os.Stderr, "usage: airlock plan <repo-path|plan-input.json>")
 			os.Exit(1)
 		}
 		runPlan(os.Args[2])
+	case "intake-compile":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: airlock intake-compile <repo-path|plan-input.json> [output.json]")
+			os.Exit(1)
+		}
+		out := ""
+		if len(os.Args) >= 4 {
+			out = os.Args[3]
+		}
+		runIntakeCompile(os.Args[2], out)
 	case "preflight":
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "usage: airlock preflight <repo-path>")
@@ -105,7 +116,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Println("usage: airlock <check|probe|investigate|plan|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
+	fmt.Println("usage: airlock <check|probe|investigate|plan|intake-compile|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
 }
 
 func runCheck() {
@@ -169,6 +180,41 @@ func runPlan(arg string) {
 		os.Exit(1)
 	}
 	fmt.Println(toJSON(report))
+}
+
+func runIntakeCompile(arg, out string) {
+	backend := ""
+	if kind, err := selectAutoVMBackend(); err == nil {
+		backend = string(kind)
+	}
+	input, err := research.ResolvePlanInput(arg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	rc, err := research.CompilePlanInputToRunContract(input, backend, research.HostExecutionExceptionDeclared())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if out == "" {
+		fmt.Println(toJSON(rc))
+		return
+	}
+	data, err := json.MarshalIndent(rc, "", "  ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := os.WriteFile(out, data, 0o644); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println(toJSON(map[string]any{"output": out}))
 }
 
 func runPreflight(path string) {
