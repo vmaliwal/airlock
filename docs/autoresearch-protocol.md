@@ -64,6 +64,7 @@ Probe / classification:
 - `airlock investigate <repo-path>`
 - `airlock plan <repo-path|plan-input.json>`
 - `airlock intake-compile <repo-path|plan-input.json> [output.json]`
+- `airlock synthesize <repo-path|plan-input.json> [output.json]`
 - `airlock preflight <repo-path>`
 
 Important probe statuses:
@@ -116,6 +117,10 @@ Execution note:
 Autofix and planning learning:
 - attempt lessons are stored in `lessons.jsonl`
 - autofix ranking uses prior success/failure, mutation kind, and optional `fingerprint_hints`
+- `airlock synthesize` now begins the autonomous candidate-fix path for supported bug classes by emitting structured mutation attempts into an autofix plan
+- currently validated synthesis examples include:
+  - unclosed code-block EOF preservation
+  - empty-string guard tightening for optional reasoning content
 - `airlock plan` now ranks mutation families using:
   - repo-type defaults
   - failure-text-derived fingerprint hints

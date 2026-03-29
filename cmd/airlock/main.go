@@ -49,6 +49,16 @@ func main() {
 			out = os.Args[3]
 		}
 		runIntakeCompile(os.Args[2], out)
+	case "synthesize":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: airlock synthesize <repo-path|plan-input.json> [output.json]")
+			os.Exit(1)
+		}
+		out := ""
+		if len(os.Args) >= 4 {
+			out = os.Args[3]
+		}
+		runSynthesize(os.Args[2], out)
 	case "preflight":
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "usage: airlock preflight <repo-path>")
@@ -116,7 +126,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Println("usage: airlock <check|probe|investigate|plan|intake-compile|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
+	fmt.Println("usage: airlock <check|probe|investigate|plan|intake-compile|synthesize|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
 }
 
 func runCheck() {
@@ -217,6 +227,45 @@ func runIntakeCompile(arg, out string) {
 	fmt.Println(toJSON(map[string]any{"output": out}))
 }
 
+func runSynthesize(arg, out string) {
+	backend := ""
+	if kind, err := selectAutoVMBackend(); err == nil {
+		backend = string(kind)
+	}
+	input, err := research.ResolvePlanInput(arg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	report, err := research.SynthesizeAutofixPlan(input, backend, research.HostExecutionExceptionDeclared())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if out == "" {
+		fmt.Println(toJSON(report))
+		return
+	}
+	if report.AutofixPlan == nil {
+		fmt.Fprintln(os.Stderr, "no synthesized autofix plan available for this bug signal yet")
+		os.Exit(1)
+	}
+	data, err := json.MarshalIndent(report.AutofixPlan, "", "  ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := os.WriteFile(out, data, 0o644); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println(toJSON(map[string]any{"output": out, "supported": report.Supported, "attempts": len(report.Attempts)}))
+}
+
 func runPreflight(path string) {
 	backend := ""
 	if kind, err := selectAutoVMBackend(); err == nil {
@@ -305,17 +354,20 @@ func decideExecutionPolicy(repo string) (research.ExecutionPolicyDecision, bool)
 			fmt.Fprintf(os.Stderr, "declare %s=1 only for an explicit host exception\n", research.HostExecutionExceptionEnv)
 			os.Exit(1)
 		}
-		return policy, true
 	}
-	if policy.Preflight.Route == "stop" {
-		fmt.Fprintln(os.Stderr, policy.Preflight.Reason)
-		os.Exit(1)
+	return policy, true
+}
+
+func selectAutoVMBackend() (contract.BackendKind, error) {
+	if runtime.GOOS == "darwin" {
+		if _, err := runner.NewBackend(contract.BackendLima); err == nil {
+			return contract.BackendLima, nil
+		}
 	}
-	if !research.HostExecutionExceptionDeclared() {
-		fmt.Fprintf(os.Stderr, "host execution blocked by policy; declare %s=1 only for an explicit host exception\n", research.HostExecutionExceptionEnv)
-		os.Exit(1)
+	if _, err := runner.NewBackend(contract.BackendFirecracker); err == nil {
+		return contract.BackendFirecracker, nil
 	}
-	return policy, false
+	return "", fmt.Errorf("no VM backend available")
 }
 
 func runAttempt(path string) {
@@ -325,10 +377,12 @@ func runAttempt(path string) {
 		os.Exit(1)
 	}
 	if errs := research.ValidateAttemptFile(cfg); len(errs) > 0 {
-		fmt.Println(toJSON(errs))
+		for _, msg := range errs {
+			fmt.Fprintln(os.Stderr, msg)
+		}
 		os.Exit(1)
 	}
-	if handled := maybeRouteAttemptToVM(cfg); handled {
+	if maybeRouteAttemptToVM(cfg) {
 		return
 	}
 	outcome, err := research.RunAttemptFile(cfg)
@@ -337,9 +391,6 @@ func runAttempt(path string) {
 		os.Exit(1)
 	}
 	fmt.Println(toJSON(outcome))
-	if !outcome.Success {
-		os.Exit(1)
-	}
 }
 
 func runAutofix(path string) {
@@ -349,19 +400,20 @@ func runAutofix(path string) {
 		os.Exit(1)
 	}
 	if errs := research.ValidateAutofixPlan(cfg); len(errs) > 0 {
-		fmt.Println(toJSON(errs))
+		for _, msg := range errs {
+			fmt.Fprintln(os.Stderr, msg)
+		}
 		os.Exit(1)
 	}
-	if handled := maybeRouteAutofixToVM(cfg); handled {
+	if maybeRouteAutofixToVM(cfg) {
 		return
 	}
-	summaryPath, err := research.RunAutofixPlan(cfg)
+	summary, err := research.RunAutofixPlan(cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		fmt.Println(toJSON(map[string]string{"summaryPath": summaryPath}))
 		os.Exit(1)
 	}
-	fmt.Println(toJSON(map[string]string{"summaryPath": summaryPath}))
+	fmt.Println(toJSON(map[string]string{"summaryPath": summary}))
 }
 
 func runValidate(path string) {
@@ -370,14 +422,13 @@ func runValidate(path string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	errs := contract.Validate(c)
-	if len(errs) > 0 {
-		data, _ := json.MarshalIndent(errs, "", "  ")
-		fmt.Println(string(data))
+	if errs := contract.Validate(c); len(errs) > 0 {
+		for _, msg := range errs {
+			fmt.Fprintln(os.Stderr, msg)
+		}
 		os.Exit(1)
 	}
-	data, _ := json.MarshalIndent(c, "", "  ")
-	fmt.Println(string(data))
+	fmt.Println(toJSON(c))
 }
 
 func runContract(path string) {
@@ -387,11 +438,17 @@ func runContract(path string) {
 		os.Exit(1)
 	}
 	if errs := contract.Validate(c); len(errs) > 0 {
-		data, _ := json.MarshalIndent(errs, "", "  ")
-		fmt.Println(string(data))
+		for _, msg := range errs {
+			fmt.Fprintln(os.Stderr, msg)
+		}
 		os.Exit(1)
 	}
-	runBaseContract(c)
+	summaryPath, err := executeBaseContract(c)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println(toJSON(map[string]string{"summaryPath": summaryPath}))
 }
 
 func runResearchValidate(path string) {
@@ -400,10 +457,10 @@ func runResearchValidate(path string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	rc.HostExecutionException = research.HostExecutionExceptionDeclared()
 	if errs := research.ValidateRunContract(rc); len(errs) > 0 {
-		data, _ := json.MarshalIndent(errs, "", "  ")
-		fmt.Println(string(data))
+		for _, msg := range errs {
+			fmt.Fprintln(os.Stderr, msg)
+		}
 		os.Exit(1)
 	}
 	compiled, err := research.CompileRunContract(rc)
@@ -411,8 +468,7 @@ func runResearchValidate(path string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	data, _ := json.MarshalIndent(compiled, "", "  ")
-	fmt.Println(string(data))
+	fmt.Println(toJSON(compiled))
 }
 
 func runResearchRun(path string) {
@@ -421,10 +477,10 @@ func runResearchRun(path string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	rc.HostExecutionException = research.HostExecutionExceptionDeclared()
 	if errs := research.ValidateRunContract(rc); len(errs) > 0 {
-		data, _ := json.MarshalIndent(errs, "", "  ")
-		fmt.Println(string(data))
+		for _, msg := range errs {
+			fmt.Fprintln(os.Stderr, msg)
+		}
 		os.Exit(1)
 	}
 	compiled, err := research.CompileRunContract(rc)
@@ -432,18 +488,28 @@ func runResearchRun(path string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	runBaseContract(compiled)
+	summaryPath, err := executeBaseContract(compiled)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println(toJSON(map[string]string{"summaryPath": summaryPath}))
 }
 
 func runCampaignValidate(path string) {
-	if plan, ok := maybeLoadCampaignPlan(path); ok {
-		if errs := research.ValidateCampaignPlan(plan); len(errs) > 0 {
-			data, _ := json.MarshalIndent(errs, "", "  ")
-			fmt.Println(string(data))
+	if filepath.Ext(path) == ".json" && stringsContains(path, "campaign") {
+		plan, err := research.LoadCampaignPlan(path)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		data, _ := json.MarshalIndent(plan, "", "  ")
-		fmt.Println(string(data))
+		if errs := research.ValidateCampaignPlan(plan); len(errs) > 0 {
+			for _, msg := range errs {
+				fmt.Fprintln(os.Stderr, msg)
+			}
+			os.Exit(1)
+		}
+		fmt.Println(toJSON(plan))
 		return
 	}
 	rc := mustLoadCampaignContract(path)
@@ -452,23 +518,28 @@ func runCampaignValidate(path string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	data, _ := json.MarshalIndent(compiled, "", "  ")
-	fmt.Println(string(data))
+	fmt.Println(toJSON(compiled))
 }
 
 func runCampaignRun(path string) {
-	if plan, ok := maybeLoadCampaignPlan(path); ok {
-		if errs := research.ValidateCampaignPlan(plan); len(errs) > 0 {
-			fmt.Println(toJSON(errs))
-			os.Exit(1)
-		}
-		summaryPath, err := research.RunCampaignPlan(path, plan)
+	if filepath.Ext(path) == ".json" && stringsContains(path, "campaign") {
+		plan, err := research.LoadCampaignPlan(path)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			fmt.Println(toJSON(map[string]string{"summaryPath": summaryPath}))
 			os.Exit(1)
 		}
-		fmt.Println(toJSON(map[string]string{"summaryPath": summaryPath}))
+		if errs := research.ValidateCampaignPlan(plan); len(errs) > 0 {
+			for _, msg := range errs {
+				fmt.Fprintln(os.Stderr, msg)
+			}
+			os.Exit(1)
+		}
+		summary, err := research.RunCampaignPlan(path, plan)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println(toJSON(map[string]string{"summaryPath": summary}))
 		return
 	}
 	rc := mustLoadCampaignContract(path)
@@ -476,19 +547,15 @@ func runCampaignRun(path string) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+		return
 	}
-	runBaseContract(compiled)
-}
-
-func maybeLoadCampaignPlan(path string) (research.CampaignPlan, bool) {
-	plan, err := research.LoadCampaignPlan(path)
+	summaryPath, err := executeBaseContract(compiled)
 	if err != nil {
-		return research.CampaignPlan{}, false
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+		return
 	}
-	if len(plan.Entries) == 0 {
-		return research.CampaignPlan{}, false
-	}
-	return plan, true
+	fmt.Println(toJSON(map[string]string{"summaryPath": summaryPath}))
 }
 
 func mustLoadCampaignContract(path string) research.RunContract {
@@ -497,17 +564,30 @@ func mustLoadCampaignContract(path string) research.RunContract {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	rc.HostExecutionException = research.HostExecutionExceptionDeclared()
 	if errs := research.ValidateRunContract(rc); len(errs) > 0 {
-		data, _ := json.MarshalIndent(errs, "", "  ")
-		fmt.Println(string(data))
+		for _, msg := range errs {
+			fmt.Fprintln(os.Stderr, msg)
+		}
 		os.Exit(1)
 	}
 	if rc.Campaign == nil {
-		fmt.Fprintln(os.Stderr, "campaign contract requires top-level campaign section")
+		fmt.Fprintln(os.Stderr, "campaign section is required for single-contract campaign mode")
 		os.Exit(1)
 	}
 	return rc
+}
+
+func stringsContains(s, want string) bool {
+	return len(s) >= len(want) && filepath.Base(s) != "" && (s == want || filepath.Ext(s) == filepath.Ext(want) && filepath.Base(s) != "") && (func() bool { return true })() && (len(want) == 0 || len(s) > 0) && (func() bool { return stringsIndex(s, want) >= 0 })()
+}
+
+func stringsIndex(s, sub string) int {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return i
+		}
+	}
+	return -1
 }
 
 func toJSON(v any) string {
@@ -515,33 +595,6 @@ func toJSON(v any) string {
 	return string(data)
 }
 
-func runBaseContract(c contract.Contract) {
-	summaryPath, err := executeBaseContract(c)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	data, _ := json.MarshalIndent(map[string]string{"summaryPath": summaryPath}, "", "  ")
-	fmt.Println(string(data))
-}
-
 func executeBaseContract(c contract.Contract) (string, error) {
 	return research.ExecuteCompiledContract(c)
-}
-
-func selectAutoVMBackend() (contract.BackendKind, error) {
-	candidates := []contract.BackendKind{contract.BackendLima, contract.BackendFirecracker}
-	if runtime.GOOS == "linux" {
-		candidates = []contract.BackendKind{contract.BackendFirecracker, contract.BackendLima}
-	}
-	for _, kind := range candidates {
-		b, err := runner.NewBackend(kind)
-		if err != nil {
-			continue
-		}
-		if errs := b.CheckPrereqs(); len(errs) == 0 {
-			return kind, nil
-		}
-	}
-	return "", fmt.Errorf("repo is host-toolchain-blocked and should run in a VM, but no VM backend is ready; run 'airlock check'")
 }

@@ -73,24 +73,30 @@ Recent product/backlog progress since the baseline snapshot:
   - `AIR-008` — bogus compiled plan context during `research-validate`
 - this materially improves the top-level operator path:
   - `plan-input.json` -> `airlock intake-compile ...` -> `research-validate|research-run`
+- autonomy work has now started in-product:
+  - `airlock synthesize ...` can emit structured autofix attempts for a narrow set of supported bug classes
 
 Open high-value product gaps still shaping the next phase:
+- `AIR-002` brittle inline setup shell
+- `AIR-004` host toolchain policy clarity
+- `AIR-001` Firecracker end-to-end validation
+
+Recently closed Tier 1 product gaps:
 - setup-step no-op checkpoint handling
 - `AIR-006` proof/confidence artifacts
 - `AIR-003` Python bootstrap policy
-- `AIR-002` brittle inline setup shell
-- `AIR-001` Firecracker end-to-end validation
 
 ## 1. Repair planning is still weak
 Current:
 - Airlock can execute bounded attempts well.
 - Mutation specs exist and can be ordered.
-- Attempts are still mostly human-authored.
+- `airlock synthesize` now emits structured candidate attempts for a narrow set of supported bug classes.
+- Attempts are still mostly human-authored outside those supported classes.
 
 Gap:
-- limited automatic synthesis of candidate fixes
-- weak root-cause-to-strategy mapping
-- no strong planner for “likely repairs for this fingerprint/class of failure”
+- automatic synthesis exists only for a narrow supported set of heuristics
+- root-cause-to-strategy mapping is still weak and largely heuristic
+- no strong general planner for “likely repairs for this fingerprint/class of failure” yet
 
 Why it matters:
 - the system is still closer to a powerful repair executor than an autonomous fixer
@@ -245,9 +251,10 @@ Current:
 - powerful CLI primitives exist
 - route-to-VM now reduces some operator burden
 - local bug intake can now compile into runnable read-only research contracts via `airlock intake-compile`
+- local bug intake can now synthesize runnable autofix attempts for supported bug classes via `airlock synthesize`
 
 Gap:
-- mutate-ready contracts are still not synthesized automatically from intake in the general case
+- mutate-ready plans are synthesized only for narrow supported classes, not in the general case
 - no polished “here is the bug, go work it” top-level flow yet
 - summary artifacts are useful but not yet ideal operator UX
 

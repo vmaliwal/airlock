@@ -2,7 +2,7 @@
 
 Airlock is a disposable VM sandbox runner for executing untrusted repository workflows outside the host machine.
 
-It also contains the canonical command-first autoresearch engine: probe, classify, reproduce, attempt bounded fixes, validate, learn, and run those loops inside disposable VMs when host execution is not trustworthy or not viable.
+It also contains the canonical command-first autoresearch engine: probe, classify, reproduce, synthesize bounded candidate fixes for supported bug classes, validate, learn, and run those loops inside disposable VMs when host execution is not trustworthy or not viable.
 
 Principles:
 - untrusted repos never run on the host
@@ -66,6 +66,8 @@ go test ./...
 ./airlock plan path/to/plan-input.json
 ./airlock intake-compile path/to/plan-input.json
 ./airlock intake-compile path/to/plan-input.json /tmp/issue-readonly.json
+./airlock synthesize path/to/plan-input.json
+./airlock synthesize path/to/plan-input.json /tmp/issue-autofix.json
 ./airlock preflight /path/to/repo-or-subdir
 ```
 
@@ -80,6 +82,11 @@ go test ./...
 - it compiles a local bug signal into a runnable **read-only** research contract
 - the generated artifact can go straight into `research-validate` or `research-run`
 - this removes the old need to hand-author a starting research contract in the common local-intake case
+
+`synthesize` is the first autonomy bridge for repair generation:
+- it compiles a local bug signal into a runnable `autofix` plan when a supported synthesis heuristic matches
+- today this is intentionally narrow and bug-class-based, not a general autonomous fixer yet
+- the output can go straight into `autofix-run`
 
 Probe now distinguishes between:
 - `ready` — repo is runnable with no immediate structural warning
