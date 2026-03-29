@@ -413,3 +413,37 @@ This remains in progress because the product still needs:
 - better planner file/context narrowing
 - stronger reviewer-facing PR summary output
 - more evidence across real OSS repos
+
+## AIR-010 — Top-level UX is still too operator-heavy
+- Status: `planned`
+- Severity: `sev1`
+- Type: `ux`
+- First seen: `2026-03-29`
+- Reported by: `operator`
+- Source repo: `multiple`
+- Source issue: `n/a`
+- Affected command: `airlock fix <github-issue-url>`
+
+### Problem
+Airlock’s underlying capabilities are improving, but the main user flow still requires operator familiarity with lower-level commands like `plan`, `intake-compile`, `synthesize`, and `autofix-run`. The intended product entry point should be one visible command that resolves an issue URL, shows progress, and produces a real output artifact.
+
+### Evidence
+- current flow still exposes plan-input files and multiple subcommands to reach a repair attempt
+- roadmap intent is converging on `airlock fix <github-issue-url>` with visible progress and tangible output
+
+### User impact
+Makes the product feel like an expert toolchain rather than a simple autonomous fixing product.
+
+### Expected
+Airlock should provide a top-level command like:
+- `airlock fix <github-issue-url>`
+that performs intake, routing, repro, synthesis, attempt execution, proof capture, and PR/output preparation with clear progress stages.
+
+### Current workaround
+Use the lower-level command ladder directly.
+
+### Notes
+This should ship with simple distribution too:
+- primary install via `go install github.com/vmaliwal/airlock/cmd/airlock@latest`
+- optional convenience installer via `install.sh` / release binaries
+- explicitly no Homebrew path for now

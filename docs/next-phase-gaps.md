@@ -94,6 +94,7 @@ This is now the primary next workstream.
 Goal:
 - move from safe autoresearch + bounded repair execution
 - to planner-backed candidate-fix generation for supported issue classes
+- and toward a top-level operator UX of `airlock fix <github-issue-url>`
 
 End-to-end target flow:
 - issue/bug signal
@@ -104,6 +105,7 @@ End-to-end target flow:
 - `autofix-run` executes them
 - proof-state artifacts summarize outcome
 - reviewer-facing output explains repro, fix, confidence, and residual uncertainty
+- top-level UX eventually collapses this into one visible command: `airlock fix <github-issue-url>`
 
 Required slices:
 1. **Planner prompt/compiler layer**
@@ -129,7 +131,15 @@ Required slices:
 4. **End-to-end operator path**
    - smooth `synthesize -> autofix-run -> proof-state -> PR summary` flow
    - reduce unsupported-class fallthrough confusion
-5. **Honest messaging**
+5. **Top-level operator UX**
+   - build toward `airlock fix <github-issue-url>` as the default product entry point
+   - show visible progress across resolve, clone, repro, synthesis, attempts, proof, and PR/output steps
+   - keep lower-level JSON/contracts as internal artifacts and advanced escape hatches
+6. **Install and distribution**
+   - primary install path: `go install github.com/vmaliwal/airlock/cmd/airlock@latest`
+   - optional convenience path: `install.sh` / release-binary installer
+   - explicitly skip Homebrew for now
+7. **Honest messaging**
    - describe current state as autonomous candidate-fix generation for supported classes
    - do not claim broad autonomous bug fixing until planner coverage and evals justify it
 

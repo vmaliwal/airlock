@@ -42,6 +42,18 @@ Current minimum toolchain: **Go 1.23+**
 - Guest runner payload generation: implemented
 - End-to-end guest validation depends on host backend availability (`limactl` on macOS, Firecracker host shim on Linux)
 
+## Install
+
+Primary install path:
+
+```bash
+go install github.com/vmaliwal/airlock/cmd/airlock@latest
+```
+
+Optional convenience install path:
+- a simple `install.sh`/release-binary installer should exist for users who do not want a Go toolchain locally
+- Homebrew is intentionally not the current distribution path
+
 ## Build
 
 ```bash
