@@ -1,6 +1,7 @@
 package research
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,7 +34,18 @@ func SynthesizeAutofixPlan(input PlanInput, vmBackend string, allowHostExecution
 	}
 	profile := report.Investigation.Profile
 	validationCmd := applyRuntimeBootstrapPolicy(profile, compiledTargetCommand(input, report))
-	attempts, summary := synthesizeAttemptsForInput(input, profile, validationCmd)
+	attempts := []SynthesizedAttempt{}
+	summary := ""
+	if planner, enabled, err := plannerFactory(); err != nil {
+		return SynthesisReport{}, err
+	} else if enabled {
+		attempts, summary, err = synthesizeWithPlanner(context.Background(), planner, input, report, validationCmd)
+		if err != nil {
+			return SynthesisReport{}, err
+		}
+	} else {
+		attempts, summary = synthesizeAttemptsForInput(input, profile, validationCmd)
+	}
 	resp := SynthesisReport{
 		Input:         input,
 		Investigation: report.Investigation,

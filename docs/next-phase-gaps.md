@@ -75,6 +75,7 @@ Recent product/backlog progress since the baseline snapshot:
   - `plan-input.json` -> `airlock intake-compile ...` -> `research-validate|research-run`
 - autonomy work has now started in-product:
   - `airlock synthesize ...` can emit structured autofix attempts for a narrow set of supported bug classes
+  - `airlock synthesize` now also supports an optional planner-backed structured synthesis path via the official Anthropic Go SDK when configured with planner env vars
 
 Open high-value product gaps still shaping the next phase:
 - `AIR-009` planner-backed autonomous attempt synthesis is still too narrow
@@ -140,9 +141,9 @@ Current:
 - Attempts are still mostly human-authored outside those supported classes.
 
 Gap:
-- automatic synthesis exists only for a narrow supported set of heuristics
-- root-cause-to-strategy mapping is still weak and largely heuristic
-- no strong general planner for “likely repairs for this fingerprint/class of failure” yet
+- planner-backed synthesis now exists, but automatic synthesis still covers only a narrow supported set in practice
+- root-cause-to-strategy mapping is still weak and lightly contextual
+- no strong evaluated general planner for “likely repairs for this fingerprint/class of failure” yet
 
 Why it matters:
 - the system is still closer to a powerful repair executor than an autonomous fixer

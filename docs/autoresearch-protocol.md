@@ -118,6 +118,13 @@ Autofix and planning learning:
 - attempt lessons are stored in `lessons.jsonl`
 - autofix ranking uses prior success/failure, mutation kind, and optional `fingerprint_hints`
 - `airlock synthesize` now begins the autonomous candidate-fix path for supported bug classes by emitting structured mutation attempts into an autofix plan
+- it now has two synthesis modes:
+  - built-in heuristic synthesis for validated narrow bug classes
+  - optional planner-backed structured synthesis when configured with:
+    - `AIRLOCK_PLANNER_PROVIDER=anthropic`
+    - `ANTHROPIC_API_KEY=...`
+    - optional `AIRLOCK_PLANNER_MODEL`
+- planner-backed synthesis still normalizes all model output into bounded Airlock mutation attempts before execution
 - currently validated synthesis examples include:
   - unclosed code-block EOF preservation
   - empty-string guard tightening for optional reasoning content

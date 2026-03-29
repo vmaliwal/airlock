@@ -32,6 +32,9 @@ Airlock is an infra/security tool. Go gives us:
 - easy macOS/Linux support
 - no Node runtime dependency on the operator machine
 
+Current minimum toolchain: **Go 1.23+**
+- this is now required by the official Anthropic Go SDK used for planner-backed synthesis
+
 ## Status
 
 - Lima backend: implemented at the orchestration layer for macOS
@@ -84,9 +87,14 @@ go test ./...
 - this removes the old need to hand-author a starting research contract in the common local-intake case
 
 `synthesize` is the first autonomy bridge for repair generation:
-- it compiles a local bug signal into a runnable `autofix` plan when a supported synthesis heuristic matches
-- today this is intentionally narrow and bug-class-based, not a general autonomous fixer yet
+- by default it uses built-in narrow synthesis heuristics for supported bug classes
+- it can now also use a planner-backed structured synthesis path when configured with:
+  - `AIRLOCK_PLANNER_PROVIDER=anthropic`
+  - `ANTHROPIC_API_KEY=...`
+  - optional: `AIRLOCK_PLANNER_MODEL=claude-sonnet-4-5`
+- planner-backed synthesis still returns bounded native Airlock mutation attempts, not arbitrary patch blobs
 - the output can go straight into `autofix-run`
+- current honest positioning remains: supported-class autonomous candidate-fix generation, not broad autonomous bug fixing yet
 
 Probe now distinguishes between:
 - `ready` — repo is runnable with no immediate structural warning

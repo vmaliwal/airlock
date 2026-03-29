@@ -404,10 +404,12 @@ Airlock should support an end-to-end planner loop:
 Use the narrow heuristic synthesis path where supported, or hand-author attempts/contracts for unsupported bug classes.
 
 ### Notes
-This is the next major product program, not a copy tweak. Remaining implementation slices should cover:
-- planner prompt/input packaging
-- schema-constrained LLM output
-- attempt normalization + safety validation
+A first provider-backed implementation now exists behind `airlock synthesize` when configured with `AIRLOCK_PLANNER_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`.
+It packages investigation context, candidate file snippets, and allowed mutation kinds into a structured planner call, then normalizes the response back into native Airlock `AttemptFile` mutations.
+
+This remains in progress because the product still needs:
 - top-N planner evals
 - broader bug-class coverage
-- synthesize -> autofix -> proof -> PR-quality summary path
+- better planner file/context narrowing
+- stronger reviewer-facing PR summary output
+- more evidence across real OSS repos
