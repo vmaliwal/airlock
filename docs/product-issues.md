@@ -225,3 +225,50 @@ Point Airlock at a subdir that it already handles correctly or manually supply m
 
 ### Notes
 This is a real product issue exposed by repo intake and should be fixed only after triage/prioritization, not silently during repo work.
+
+## AIR-006 — Fix confidence and proof state are not first-class artifacts
+- Status: `new`
+- Severity: `sev2`
+- Type: `eval`
+- First seen: `2026-03-28`
+- Reported by: `operator`
+- Source repo: `multiple`
+- Source issue: `n/a`
+- Affected command: `airlock attempt-run`, `airlock autofix-run`, `airlock research-run`
+
+### Problem
+Airlock does not currently record a structured distinction between:
+- plausible fix
+- reproduced-before / passing-after fix
+- exact issue-level fix confidence
+
+As a result, operators can over-read a passing targeted test as stronger evidence than it really is.
+
+### Evidence
+- recent repo loops required manual reasoning about confidence level for:
+  - `charmbracelet/gum#1017`
+  - `cli/cli#12585`
+- no first-class artifact fields currently encode:
+  - proof that failure was reproduced before patch
+  - proof that the exact repro passed after patch
+  - validation scope ring
+  - resulting confidence level
+
+### User impact
+Makes it harder to tell whether Airlock fixed:
+- the exact reported bug
+- the underlying bug class
+- or only a plausible nearby issue
+
+### Expected
+Airlock should emit explicit proof-state / confidence metadata such as:
+- `repro_status`
+- `validation_scope`
+- `fix_confidence`
+- `confidence_reason`
+
+### Current workaround
+Operator manually inspects the evidence chain and narrates confidence in prose.
+
+### Notes
+This should become a product-level evaluation artifact, not only a human judgment step.
