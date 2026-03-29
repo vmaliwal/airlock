@@ -30,6 +30,7 @@ type CommandResult struct {
 type RepoProfile struct {
 	RepoPath          string   `json:"repoPath"`
 	RepoRoot          string   `json:"repoRoot"`
+	ScopeRoot         string   `json:"scopeRoot,omitempty"`
 	TargetPath        string   `json:"targetPath"`
 	RepoType          string   `json:"repoType"`
 	DetectedFiles     []string `json:"detectedFiles"`

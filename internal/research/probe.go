@@ -16,7 +16,8 @@ func DetectRepo(startPath string) (RepoProfile, error) {
 		return RepoProfile{}, err
 	}
 	repoRoot := detectRepoRoot(targetPath)
-	detectedFiles := detectFiles(repoRoot)
+	scopeRoot := detectScopeRoot(targetPath, repoRoot)
+	detectedFiles := detectFiles(scopeRoot)
 	discoveredTargets := []string{}
 	bootstrapHints := []string{}
 	repoType := "unknown"
@@ -25,10 +26,10 @@ func DetectRepo(startPath string) (RepoProfile, error) {
 		repoType = "go"
 	case contains(detectedFiles, "package.json"):
 		repoType = "node"
-		bootstrapHints = nodeBootstrapHints(repoRoot)
+		bootstrapHints = nodeBootstrapHints(scopeRoot)
 	case contains(detectedFiles, "pyproject.toml"):
 		repoType = "python"
-		bootstrapHints = pythonBootstrapHints(repoRoot)
+		bootstrapHints = pythonBootstrapHints(scopeRoot)
 	case contains(detectedFiles, "Cargo.toml"):
 		repoType = "rust"
 	default:
@@ -37,11 +38,12 @@ func DetectRepo(startPath string) (RepoProfile, error) {
 	return RepoProfile{
 		RepoPath:          startPath,
 		RepoRoot:          repoRoot,
+		ScopeRoot:         scopeRoot,
 		TargetPath:        targetPath,
 		RepoType:          repoType,
 		DetectedFiles:     detectedFiles,
 		DiscoveredTargets: discoveredTargets,
-		BaselineCommands:  baselineCommandsFor(repoType, repoRoot, targetPath),
+		BaselineCommands:  baselineCommandsFor(repoType, scopeRoot, targetPath),
 		BootstrapHints:    bootstrapHints,
 	}, nil
 }
@@ -50,6 +52,9 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 	blockers := []string{}
 	warnings := []string{}
 	evidence := []string{"repo_root=" + profile.RepoRoot, "target_path=" + profile.TargetPath}
+	if profile.ScopeRoot != "" && !samePath(profile.ScopeRoot, profile.RepoRoot) {
+		evidence = append(evidence, "scope_root="+profile.ScopeRoot)
+	}
 	hostRunnable := true
 	vmRunnable := true
 	toolchainBlocked := false
@@ -61,7 +66,11 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 		}
 	}
 	if profile.RepoType == "go" {
-		goModBytes, err := os.ReadFile(filepath.Join(profile.RepoRoot, "go.mod"))
+		goRoot := profile.ScopeRoot
+		if goRoot == "" {
+			goRoot = profile.RepoRoot
+		}
+		goModBytes, err := os.ReadFile(filepath.Join(goRoot, "go.mod"))
 		if err == nil {
 			goMod := string(goModBytes)
 			if req := detectGoDirective(goMod); req != "" {
@@ -80,7 +89,7 @@ func AssessRepo(profile RepoProfile) (RepoAssessment, error) {
 			evidence = append(evidence, "detected "+strconv.Itoa(len(matches))+" local replace directives in go.mod")
 			for _, m := range matches {
 				rel := m[1]
-				abs := filepath.Join(profile.RepoRoot, rel)
+				abs := filepath.Join(goRoot, rel)
 				info, err := os.Stat(abs)
 				if err != nil {
 					blockers = append(blockers, "missing local replace target: "+rel)
@@ -170,6 +179,33 @@ func detectRepoRoot(start string) string {
 		}
 		current = parent
 	}
+}
+
+func detectScopeRoot(targetPath, repoRoot string) string {
+	current := targetPath
+	for {
+		if hasManifest(current) {
+			return current
+		}
+		if samePath(current, repoRoot) {
+			break
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return repoRoot
+}
+
+func hasManifest(root string) bool {
+	for _, name := range []string{"package.json", "go.mod", "pyproject.toml", "Cargo.toml"} {
+		if exists(filepath.Join(root, name)) {
+			return true
+		}
+	}
+	return false
 }
 
 func detectFiles(root string) []string {

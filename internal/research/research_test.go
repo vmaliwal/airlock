@@ -192,4 +192,50 @@ func TestAssessRepoPartialRunnableScope(t *testing.T) {
 	if assessment.Status != "partial_runnable_scope" {
 		t.Fatalf("unexpected assessment: %#v", assessment)
 	}
+	if profile.RepoType != "node" {
+		t.Fatalf("expected node repo type for concrete target, got %#v", profile)
+	}
+	if profile.ScopeRoot == "" || !samePath(profile.ScopeRoot, filepath.Join(repo, "apps", "web")) {
+		t.Fatalf("expected scope root to be target package, got %#v", profile)
+	}
+}
+
+func TestDetectRepoConcretePythonSubdirUsesTargetManifest(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-python-subdir-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(repo, "libs", "text-splitters")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "pyproject.toml"), []byte("[project]\nname='text-splitters'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "uv.lock"), []byte("version = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := DetectRepo(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.RepoType != "python" {
+		t.Fatalf("expected python repo type, got %#v", profile)
+	}
+	if profile.ScopeRoot == "" || !samePath(profile.ScopeRoot, target) {
+		t.Fatalf("expected scope root %s, got %#v", target, profile)
+	}
+	if !contains(profile.DetectedFiles, "pyproject.toml") || !contains(profile.DetectedFiles, "uv.lock") {
+		t.Fatalf("expected target files to be detected, got %#v", profile.DetectedFiles)
+	}
+	if len(profile.BaselineCommands) == 0 || profile.BaselineCommands[0] != "pytest" {
+		t.Fatalf("expected python baseline commands, got %#v", profile.BaselineCommands)
+	}
+	if len(profile.BootstrapHints) == 0 {
+		t.Fatalf("expected python bootstrap hints, got %#v", profile)
+	}
 }
