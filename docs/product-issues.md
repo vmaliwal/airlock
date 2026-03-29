@@ -272,3 +272,64 @@ Operator manually inspects the evidence chain and narrates confidence in prose.
 
 ### Notes
 This should become a product-level evaluation artifact, not only a human judgment step.
+
+## AIR-007 — Bug intake still does not compile directly into runnable research execution
+- Status: `new`
+- Severity: `sev2`
+- Type: `ux`
+- First seen: `2026-03-29`
+- Reported by: `repo validation`
+- Source repo: `langchain-ai/langchain`
+- Source issue: `#36194`
+- Affected command: `airlock plan`, `airlock research-run`
+
+### Problem
+Airlock can intake a bug signal via `plan`, but it still does not provide a clean direct path from that intake into a runnable VM-backed research execution. For real issue work, operators still need to hand-author or adapt a research contract.
+
+### Evidence
+- `airlock plan` produced useful investigation output for `langchain-ai/langchain#36194`
+- execution still requires a manually authored/adapted research contract to proceed into Lima-backed validation
+- this is especially visible for Python repos where VM routing is correct but the top-level intake-to-run path remains operator-heavy
+
+### User impact
+The product still feels like separate tools rather than one issue-intake-to-fix flow.
+
+### Expected
+A bug signal should compile into an executable bounded run plan or research contract artifact without manual contract authoring in the common case.
+
+### Current workaround
+Operator adapts an existing research contract or authors a new one by hand.
+
+### Notes
+Manual contracts are still acceptable for isolating missing capability, but this gap should be tracked explicitly instead of normalized.
+
+## AIR-008 — Compiled research plan can be synthesized against the wrong host repo context
+- Status: `new`
+- Severity: `sev2`
+- Type: `planner`
+- First seen: `2026-03-29`
+- Reported by: `repo validation`
+- Source repo: `langchain-ai/langchain`
+- Source issue: `#36194`
+- Affected command: `airlock research-validate`
+
+### Problem
+When validating a research contract, Airlock may synthesize and embed a `plan` using the control-plane working directory instead of the target repo context. This can produce misleading compiled plans with incorrect repo roots, repo types, and candidate commands.
+
+### Evidence
+- `research-validate` for `langchain-empty-reasoning-36194-research.json` embedded a plan with:
+  - `targetRepo: /Users/varun/repos/airlock`
+  - candidate commands like `go test ./libs/core`
+- the actual target repo is `langchain-ai/langchain` subdir `libs/core`
+
+### User impact
+Makes compiled artifacts less trustworthy and can mislead operators or future automation layers that consume compiled plan data.
+
+### Expected
+If a plan is synthesized during compilation, it should use the intended target repo context or be omitted when that context is unavailable.
+
+### Current workaround
+Treat the compiled plan as advisory only and rely on the explicitly authored contract for execution.
+
+### Notes
+This did not block the current run, but it is a real product correctness issue.
