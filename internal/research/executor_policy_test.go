@@ -37,6 +37,34 @@ func TestExecuteRunContractSetupCommitNoopDoesNotFail(t *testing.T) {
 	}
 }
 
+func TestExecuteRunContractReadOnlyWritesProofState(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-exec-proof-repo-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := InitTempGitRepo(repo, map[string]string{"a.txt": "ok\n"}); err != nil {
+		t.Fatal(err)
+	}
+	artifacts, err := os.MkdirTemp("", "airlock-exec-proof-artifacts-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(artifacts)
+	var rc RunContract
+	rc.Objective = "test"
+	rc.Mode = "read_only"
+	rc.Airlock.Backend.Kind = base.BackendLima
+	rc.Reproduction = Phase{Command: "false", Repeat: 1, Success: SuccessRule{MinFailures: pintVal(1)}}
+	rc.Validation = ValidationSpec{TargetCommand: "true", Repeat: 1, Success: SuccessRule{ExitCode: pintVal(0)}}
+	if err := ExecuteRunContract(rc, repo, artifacts); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(artifacts, "proof-state.json")); err != nil {
+		t.Fatalf("expected proof-state artifact, got %v", err)
+	}
+}
+
 func TestExecuteRunContractWritesExecutionPolicy(t *testing.T) {
 	repo, err := os.MkdirTemp("", "airlock-exec-policy-repo-")
 	if err != nil {
