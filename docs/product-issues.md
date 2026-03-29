@@ -140,7 +140,7 @@ Use patch-based setup or simpler bounded file-mutation helpers.
 This is a product-quality issue even if the underlying runtime can still succeed.
 
 ## AIR-003 — Python guest bootstrap policy is still too implicit
-- Status: `triaged`
+- Status: `validated`
 - Severity: `sev2`
 - Type: `runtime`
 - First seen: `2026-03-28`
@@ -155,6 +155,14 @@ Python repos often require venv-first bootstrap inside the guest, but this is st
 ### Evidence
 - source learning recorded in `docs/next-phase-gaps.md`
 - repo validation: `langchain-ai/langchain` (`libs/core`)
+- validated fix now makes Python bootstrap explicit in generated intake contracts:
+  - generated setup includes `bootstrap python venv`
+  - Python commands are rewritten through `.venv/bin/python`
+  - install policy is explicit for `requirements.txt` and `pyproject.toml`
+- tests:
+  - `GOTOOLCHAIN=local go test ./internal/research/... -count=1`
+  - `GOTOOLCHAIN=local go test ./... -count=1`
+- real command check via `airlock intake-compile` on LangChain text-splitters confirmed the generated setup and command policy
 
 ### User impact
 Causes avoidable bootstrap failures or extra operator work in Python repos.
@@ -163,10 +171,10 @@ Causes avoidable bootstrap failures or extra operator work in Python repos.
 Python repos should route toward clearer venv-first bootstrap defaults and stronger planning hints.
 
 ### Current workaround
-Manually author venv-aware setup commands.
+Previously: manually author venv-aware setup commands.
 
 ### Notes
-Likely should become planner/runtime policy, not only docs.
+This now exists as explicit runtime policy for compiled intake flows. More advanced Python setup synthesis may still be needed for harder repos.
 
 ## AIR-004 — Host toolchain policy is correct but underexplained
 - Status: `triaged`
