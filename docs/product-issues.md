@@ -231,7 +231,7 @@ Previously: point Airlock at a subdir that it already handles correctly or manua
 Fixed by introducing concrete `scopeRoot` detection for targeted packages so classification/bootstrap hints use the package scope instead of only the git root.
 
 ## AIR-006 — Fix confidence and proof state are not first-class artifacts
-- Status: `new`
+- Status: `validated`
 - Severity: `sev2`
 - Type: `eval`
 - First seen: `2026-03-28`
@@ -252,11 +252,18 @@ As a result, operators can over-read a passing targeted test as stronger evidenc
 - recent repo loops required manual reasoning about confidence level for:
   - `charmbracelet/gum#1017`
   - `cli/cli#12585`
-- no first-class artifact fields currently encode:
-  - proof that failure was reproduced before patch
-  - proof that the exact repro passed after patch
-  - validation scope ring
-  - resulting confidence level
+- validated fix now emits first-class proof-state fields:
+  - `repro_status`
+  - `validation_scope`
+  - `fix_confidence`
+  - `confidence_reason`
+- artifacts now include proof-state in:
+  - `proof-state.json`
+  - `validation-results.json`
+  - `outcome.md`
+- tests:
+  - `GOTOOLCHAIN=local go test ./internal/research/... -count=1`
+  - `GOTOOLCHAIN=local go test ./... -count=1`
 
 ### User impact
 Makes it harder to tell whether Airlock fixed:
@@ -272,10 +279,10 @@ Airlock should emit explicit proof-state / confidence metadata such as:
 - `confidence_reason`
 
 ### Current workaround
-Operator manually inspects the evidence chain and narrates confidence in prose.
+Previously: operator manually inspects the evidence chain and narrates confidence in prose.
 
 ### Notes
-This should become a product-level evaluation artifact, not only a human judgment step.
+This is now productized as a first proof layer; future work can still deepen the confidence model.
 
 ## AIR-007 — Bug intake still does not compile directly into runnable research execution
 - Status: `validated`
