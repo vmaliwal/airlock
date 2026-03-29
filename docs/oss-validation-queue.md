@@ -25,6 +25,15 @@ Pick repos that are:
 - `charmbracelet/gum`
 - `ashupednekar/litefunctions/portal`
 
+Recent validated issue examples:
+- `langchain-ai/langchain#36297`
+- `langchain-ai/langchain#36194`
+- `langchain-ai/langchain#36186`
+- `cli/cli#12927`
+- `cli/cli#12585`
+- `charmbracelet/gum#1017`
+- `charmbracelet/gum#1022`
+
 ## Recommended next wave
 
 ### 1. `cli/cli`

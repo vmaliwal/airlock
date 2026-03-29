@@ -1,6 +1,6 @@
 # Next-Phase Gaps
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 Baseline version: `v0.1.0` (`c93e806`)
 
 This document is the durable gap tracker for Airlock.
@@ -61,6 +61,25 @@ Current assessment:
 - manual local repros of unknown code should be treated as exceptions, not the standard workflow
 
 ## Gap Summary
+
+Recent product/backlog progress since the baseline snapshot:
+- validated real OSS successes now include:
+  - `langchain-ai/langchain#36194`
+  - `langchain-ai/langchain#36186`
+  - `charmbracelet/gum#1022`
+- recently closed issue-style product gaps:
+  - `AIR-005` — concrete package scope detection for subdir targets
+  - `AIR-007` — intake to runnable read-only contract compilation
+  - `AIR-008` — bogus compiled plan context during `research-validate`
+- this materially improves the top-level operator path:
+  - `plan-input.json` -> `airlock intake-compile ...` -> `research-validate|research-run`
+
+Open high-value product gaps still shaping the next phase:
+- setup-step no-op checkpoint handling
+- `AIR-006` proof/confidence artifacts
+- `AIR-003` Python bootstrap policy
+- `AIR-002` brittle inline setup shell
+- `AIR-001` Firecracker end-to-end validation
 
 ## 1. Repair planning is still weak
 Current:
@@ -225,10 +244,11 @@ Desired next state:
 Current:
 - powerful CLI primitives exist
 - route-to-VM now reduces some operator burden
+- local bug intake can now compile into runnable read-only research contracts via `airlock intake-compile`
 
 Gap:
-- still too much manual contract/attempt authoring
-- no polished “here is the bug, go work it” top-level flow
+- mutate-ready contracts are still not synthesized automatically from intake in the general case
+- no polished “here is the bug, go work it” top-level flow yet
 - summary artifacts are useful but not yet ideal operator UX
 
 Why it matters:
@@ -236,7 +256,7 @@ Why it matters:
 
 Desired next state:
 - tighter end-to-end task entrypoint
-- better auto-scoping, auto-planning, and final summaries
+- better auto-scoping, auto-planning, mutation scaffolding, and final summaries
 
 ## 10. PR-quality outputs are underdeveloped
 Current:
@@ -495,6 +515,7 @@ Use this section as an ongoing journal of gap discoveries and refinements.
 - Confirmed that route quality is now improving, but repair planning quality remains the larger strategic gap.
 - Probed new OSS targets:
   - `langchain-ai/langchain` root exposed a real monorepo detection gap: Airlock reported `repoType: unknown` at repo root because manifests live in nested package dirs.
+  - concrete subdir targeting for package scopes is now materially better after `AIR-005`: package-level manifests are detected via `scopeRoot` rather than only via the git root.
   - `langchain-ai/langchain/libs/core` showed that subdir probing works fine once pointed at a concrete package.
   - `cli/cli` and `charmbracelet/gum` both validated the usefulness of the `host_toolchain_blocked_vm_runnable` route.
 - New nuance discovered: host toolchain classification is policy-sensitive. Raw host `go test ./...` can succeed for some repos via Go's auto-toolchain download, while Airlock intentionally treats host execution as blocked under local-toolchain-only policy. This likely needs clearer policy documentation or an explicit configurable stance.

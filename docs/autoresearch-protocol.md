@@ -62,7 +62,8 @@ All runs:
 Probe / classification:
 - `airlock probe <repo-path>`
 - `airlock investigate <repo-path>`
-- `airlock plan <repo-path>`
+- `airlock plan <repo-path|plan-input.json>`
+- `airlock intake-compile <repo-path|plan-input.json> [output.json]`
 - `airlock preflight <repo-path>`
 
 Important probe statuses:
@@ -106,7 +107,9 @@ Campaign flows:
 
 Execution note:
 - campaign execution now uses the same compiled-contract execution helper path as other backend-driven flows
-- compiled research contracts now carry a concrete plan object when available
+- compiled research contracts now carry a concrete plan object when a real local planning target exists
+- compile-time plan synthesis is now omitted when that local target context is unavailable, rather than fabricating control-repo context
+- bug intake can now compile directly into runnable read-only research contracts via `airlock intake-compile ...`
 - run artifacts now include `execution-policy.json` so host-exception/provenance is visible after execution
 - this reduces backend/prereq drift between campaign mode and direct contract execution
 

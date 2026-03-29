@@ -64,6 +64,8 @@ go test ./...
 ./airlock investigate /path/to/repo-or-subdir
 ./airlock plan /path/to/repo-or-subdir
 ./airlock plan path/to/plan-input.json
+./airlock intake-compile path/to/plan-input.json
+./airlock intake-compile path/to/plan-input.json /tmp/issue-readonly.json
 ./airlock preflight /path/to/repo-or-subdir
 ```
 
@@ -73,6 +75,11 @@ go test ./...
 - `failingCommand`
 - `failureText`
 - `notes`
+
+`intake-compile` is the current bridge from issue intake to execution:
+- it compiles a local bug signal into a runnable **read-only** research contract
+- the generated artifact can go straight into `research-validate` or `research-run`
+- this removes the old need to hand-author a starting research contract in the common local-intake case
 
 Probe now distinguishes between:
 - `ready` — repo is runnable with no immediate structural warning
@@ -143,10 +150,18 @@ Set `AIRLOCK_LESSONS_ROOT=/path/to/lessons` to feed a broader lesson corpus into
 ```bash
 ./airlock research-validate examples/beats-kafka-alias-research.json
 ./airlock research-run examples/beats-kafka-alias-research.json
+./airlock intake-compile path/to/plan-input.json /tmp/issue-readonly.json
+./airlock research-validate /tmp/issue-readonly.json
+./airlock research-run /tmp/issue-readonly.json
 ./airlock campaign-validate examples/beats-kafka-alias-campaign.json
 ./airlock campaign-run examples/beats-kafka-alias-campaign.json
 ./airlock campaign-validate examples/beats-three-issue-campaign.json
 ./airlock campaign-run examples/beats-three-issue-campaign.json
 ```
 
-See `docs/contract.md`, `docs/autoresearch-protocol.md`, and `examples/`.
+Recent product/backlog progress reflected in the current tree:
+- `AIR-005` validated: concrete package scope detection now classifies Python subdirs correctly
+- `AIR-007` validated: bug intake now compiles into runnable read-only research contracts
+- `AIR-008` validated: `research-validate` no longer fabricates bogus compiled plans against the control repo
+
+See `docs/contract.md`, `docs/autoresearch-protocol.md`, `docs/product-issues.md`, and `examples/`.
