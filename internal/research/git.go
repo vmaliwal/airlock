@@ -138,6 +138,13 @@ func GitCommitAll(repo, message string) error {
 	if err := GitEnsureIdentity(repo); err != nil {
 		return err
 	}
+	dirty, err := GitIsDirty(repo)
+	if err != nil {
+		return err
+	}
+	if !dirty {
+		return nil
+	}
 	if _, err := util.RunLocal("git", []string{"add", "-A"}, util.RunOptions{Cwd: repo}); err != nil {
 		return err
 	}

@@ -7,6 +7,31 @@ import (
 	"testing"
 )
 
+func TestGitCommitAllNoopOnCleanTree(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-git-clean-commit-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := InitTempGitRepo(repo, map[string]string{"a.txt": "hello\n"}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := GitHeadSHA(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := GitCommitAll(repo, "noop commit"); err != nil {
+		t.Fatal(err)
+	}
+	after, err := GitHeadSHA(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before != after {
+		t.Fatalf("expected no-op commit to keep HEAD unchanged: %s != %s", before, after)
+	}
+}
+
 func TestGitHelpersLifecycle(t *testing.T) {
 	repo, err := os.MkdirTemp("", "airlock-git-test-")
 	if err != nil {
