@@ -52,8 +52,8 @@ func TestCompileRunContract(t *testing.T) {
 	if compiled.Safety.AllowedPaths[0] != "pkg/core/foo/*" {
 		t.Fatalf("expected prefixed allowed path, got %#v", compiled.Safety.AllowedPaths)
 	}
-	if compiled.Plan == nil {
-		t.Fatalf("expected compiled plan to be present, got %#v", compiled)
+	if compiled.Plan != nil {
+		t.Fatalf("expected no synthesized plan without local target path, got %#v", compiled.Plan)
 	}
 }
 

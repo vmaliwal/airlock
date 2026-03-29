@@ -1,11 +1,13 @@
 package research
 
-func (c RunContract) TargetPathOrRepoCloneURLHint() string {
-	if c.TargetPath != "" {
-		return c.TargetPath
+import "os"
+
+func (c RunContract) LocalPlanningTargetPath() string {
+	if c.TargetPath == "" {
+		return ""
 	}
-	if c.Airlock.Repo.Subdir != "" {
-		return c.Airlock.Repo.Subdir
+	if _, err := os.Stat(c.TargetPath); err != nil {
+		return ""
 	}
-	return "."
+	return c.TargetPath
 }

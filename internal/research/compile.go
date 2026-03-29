@@ -13,10 +13,12 @@ const researchRunnerTemplate = `/tmp/airlock-researchguest __CONTRACT_B64__`
 func CompileRunContract(c RunContract) (base.Contract, error) {
 	rc := c
 	if rc.Plan == nil {
-		plan, err := PlanFromInput(PlanInput{RepoPath: rc.TargetPathOrRepoCloneURLHint(), Notes: rc.Objective}, string(rc.Airlock.Backend.Kind), rc.HostExecutionException)
-		if err == nil {
-			concrete := BuildConcretePlan(plan)
-			rc.Plan = &concrete
+		if localTarget := rc.LocalPlanningTargetPath(); localTarget != "" {
+			plan, err := PlanFromInput(PlanInput{RepoPath: localTarget, Notes: rc.Objective}, string(rc.Airlock.Backend.Kind), rc.HostExecutionException)
+			if err == nil {
+				concrete := BuildConcretePlan(plan)
+				rc.Plan = &concrete
+			}
 		}
 	}
 	if subdir := rc.Airlock.Repo.Subdir; subdir != "" {
