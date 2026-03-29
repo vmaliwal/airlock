@@ -121,6 +121,9 @@ Autofix and planning learning:
 - currently validated synthesis examples include:
   - unclosed code-block EOF preservation
   - empty-string guard tightening for optional reasoning content
+- this is the first step toward the intended planner loop:
+  - repro/fingerprint/context -> candidate attempts -> autofix execution -> proof state
+- the next planned slice is planner-backed synthesis widening plus top-N planner evals
 - `airlock plan` now ranks mutation families using:
   - repo-type defaults
   - failure-text-derived fingerprint hints

@@ -367,3 +367,47 @@ Previously: treat the compiled plan as advisory only and rely on the explicitly 
 
 ### Notes
 Fixed by only synthesizing a plan during compilation when a real local planning target exists.
+
+## AIR-009 — Planner-backed autonomous attempt synthesis is still too narrow
+- Status: `in_progress`
+- Severity: `sev1`
+- Type: `planner`
+- First seen: `2026-03-29`
+- Reported by: `operator`
+- Source repo: `multiple`
+- Source issue: `n/a`
+- Affected command: `airlock synthesize`, `airlock autofix-run`
+
+### Problem
+Airlock now has a first autonomy bridge via `airlock synthesize`, but candidate-fix generation is still limited to a narrow set of heuristic bug classes. The product still lacks a general planner-backed path from reproduced failure evidence into multiple structured mutation attempts.
+
+### Evidence
+- current synthesis is validated for a narrow supported set:
+  - unclosed code-block EOF preservation
+  - empty-string reasoning-content guard tightening
+- `autofix-run` can execute structured attempts well once they exist
+- the main remaining gap is generating those attempts broadly from failure fingerprints, repo shape, and relevant code context
+
+### User impact
+Without broader planner-backed synthesis, Airlock remains closer to a safe autoresearch/repair executor than a general autonomous bug fixer.
+
+### Expected
+Airlock should support an end-to-end planner loop:
+- bug signal / repro / fingerprint
+- relevant files + narrowed context
+- LLM planner generates multiple structured candidate attempts in Airlock mutation schema
+- lessons rank them
+- `autofix-run` executes them
+- proof state and reviewer-facing outputs summarize the result
+
+### Current workaround
+Use the narrow heuristic synthesis path where supported, or hand-author attempts/contracts for unsupported bug classes.
+
+### Notes
+This is the next major product program, not a copy tweak. Remaining implementation slices should cover:
+- planner prompt/input packaging
+- schema-constrained LLM output
+- attempt normalization + safety validation
+- top-N planner evals
+- broader bug-class coverage
+- synthesize -> autofix -> proof -> PR-quality summary path

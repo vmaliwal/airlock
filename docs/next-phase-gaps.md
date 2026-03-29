@@ -77,6 +77,7 @@ Recent product/backlog progress since the baseline snapshot:
   - `airlock synthesize ...` can emit structured autofix attempts for a narrow set of supported bug classes
 
 Open high-value product gaps still shaping the next phase:
+- `AIR-009` planner-backed autonomous attempt synthesis is still too narrow
 - `AIR-002` brittle inline setup shell
 - `AIR-004` host toolchain policy clarity
 - `AIR-001` Firecracker end-to-end validation
@@ -85,6 +86,51 @@ Recently closed Tier 1 product gaps:
 - setup-step no-op checkpoint handling
 - `AIR-006` proof/confidence artifacts
 - `AIR-003` Python bootstrap policy
+
+## Next implementation program: planner-backed autonomous repair
+This is now the primary next workstream.
+
+Goal:
+- move from safe autoresearch + bounded repair execution
+- to planner-backed candidate-fix generation for supported issue classes
+
+End-to-end target flow:
+- issue/bug signal
+- reproduce and fingerprint
+- narrow relevant files/context
+- planner produces 3-10 structured candidate attempts in Airlock mutation schema
+- lessons rank attempts
+- `autofix-run` executes them
+- proof-state artifacts summarize outcome
+- reviewer-facing output explains repro, fix, confidence, and residual uncertainty
+
+Required slices:
+1. **Planner prompt/compiler layer**
+   - build a planner input package from:
+     - failure text
+     - fingerprint hints
+     - repo type
+     - candidate files
+     - relevant snippets
+     - safety constraints
+   - support schema-constrained output into structured attempts
+2. **Synthesis widening**
+   - expand beyond current heuristic Python examples
+   - first targets:
+     - Go nil/error/normalization classes
+     - broader Python parser/edge-case classes
+     - common CLI error-handling classes
+3. **Planner evals**
+   - top-1 / top-3 candidate usefulness
+   - schema-valid attempt rate
+   - success rate by bug class
+   - benchmark against proven repos/issues already validated in Airlock
+4. **End-to-end operator path**
+   - smooth `synthesize -> autofix-run -> proof-state -> PR summary` flow
+   - reduce unsupported-class fallthrough confusion
+5. **Honest messaging**
+   - describe current state as autonomous candidate-fix generation for supported classes
+   - do not claim broad autonomous bug fixing until planner coverage and evals justify it
 
 ## 1. Repair planning is still weak
 Current:
@@ -102,9 +148,10 @@ Why it matters:
 - the system is still closer to a powerful repair executor than an autonomous fixer
 
 Desired next state:
-- generate candidate attempts from fingerprints, repo structure, and failure class
+- generate candidate attempts from fingerprints, repo structure, failure class, and narrowed code context
 - support multiple repair families per bug class
 - rank attempts based on more than hand ordering
+- feed schema-constrained planner output directly into `autofix-run`
 
 ## 2. Lessons exist, but self-improvement is shallow
 Current:
