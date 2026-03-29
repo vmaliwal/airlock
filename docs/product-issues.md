@@ -197,7 +197,7 @@ Read the roadmap/policy docs.
 This is important for trust and operator understanding, even if not a runtime blocker.
 
 ## AIR-005 — Subdir package detection misses concrete Python target manifests
-- Status: `new`
+- Status: `validated`
 - Severity: `sev1`
 - Type: `classification`
 - First seen: `2026-03-28`
@@ -212,7 +212,11 @@ When targeting `libs/text-splitters` in LangChain, Airlock classified the target
 ### Evidence
 - target path: `/Users/varun/repos/experiments/langchain/libs/text-splitters`
 - manifest present: `libs/text-splitters/pyproject.toml`
-- observed plan output reported `repoType: unknown` and no Python baseline commands
+- prior observed plan output reported `repoType: unknown` and no Python baseline commands
+- validated fix now detects a concrete scope root and classifies the target correctly
+- tests:
+  - `GOTOOLCHAIN=local go test ./internal/research/... -count=1`
+  - `GOTOOLCHAIN=local go test ./... -count=1`
 
 ### User impact
 Weakens planning quality, hides correct baseline commands, and risks turning runnable package targets into unnecessary manual work.
@@ -221,10 +225,10 @@ Weakens planning quality, hides correct baseline commands, and risks turning run
 If the selected target path contains `pyproject.toml`/`package.json`/`go.mod`/`Cargo.toml`, Airlock should classify that concrete target correctly even when repo root is higher.
 
 ### Current workaround
-Point Airlock at a subdir that it already handles correctly or manually supply more context.
+Previously: point Airlock at a subdir that it already handles correctly or manually supply more context.
 
 ### Notes
-This is a real product issue exposed by repo intake and should be fixed only after triage/prioritization, not silently during repo work.
+Fixed by introducing concrete `scopeRoot` detection for targeted packages so classification/bootstrap hints use the package scope instead of only the git root.
 
 ## AIR-006 — Fix confidence and proof state are not first-class artifacts
 - Status: `new`
