@@ -2,6 +2,7 @@ package research
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vmaliwal/airlock/internal/util"
@@ -31,8 +32,15 @@ func TestCompilePlanInputToRunContractPythonSubdir(t *testing.T) {
 	if rc.Mode != "read_only" {
 		t.Fatalf("expected read_only mode, got %#v", rc)
 	}
-	if rc.Reproduction.Command != input.FailingCommand || rc.Validation.TargetCommand != input.FailingCommand {
-		t.Fatalf("expected failing command to seed reproduction/validation, got %#v", rc)
+	expectedCmd := ".venv/bin/python -m pytest tests -k unclosed_code_block"
+	if rc.Reproduction.Command != expectedCmd || rc.Validation.TargetCommand != expectedCmd {
+		t.Fatalf("expected venv-aware python command, got %#v", rc)
+	}
+	if len(rc.Setup) == 0 || rc.Setup[0].Name != "bootstrap python venv" {
+		t.Fatalf("expected python bootstrap setup, got %#v", rc.Setup)
+	}
+	if !strings.Contains(rc.Setup[0].Command, ".venv/bin/python -m pip install -q -e .") {
+		t.Fatalf("expected editable-install bootstrap policy, got %#v", rc.Setup)
 	}
 	if rc.Airlock.Repo.CloneURL != "https://github.com/example/langchain.git" {
 		t.Fatalf("unexpected clone url: %#v", rc.Airlock.Repo)

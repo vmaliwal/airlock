@@ -37,6 +37,7 @@ func CompilePlanInputToRunContract(input PlanInput, vmBackend string, allowHostE
 	}
 	objective := compiledObjective(input)
 	cmd := compiledTargetCommand(input, report)
+	cmd = applyRuntimeBootstrapPolicy(profile, cmd)
 	name := compiledNamePrefix(input, profile)
 	artifactsDir := filepath.ToSlash(filepath.Join("/tmp", "airlock-"+name))
 
@@ -44,6 +45,7 @@ func CompilePlanInputToRunContract(input PlanInput, vmBackend string, allowHostE
 	rc.Objective = objective
 	rc.Mode = "read_only"
 	rc.HostExecutionException = allowHostExecution
+	rc.Setup = defaultBootstrapSetup(profile)
 	rc.Reproduction = Phase{Command: cmd, Repeat: 1, Success: SuccessRule{MinFailures: pintCompiled(1)}}
 	rc.Validation = ValidationSpec{
 		TargetCommand: cmd,
@@ -107,6 +109,42 @@ func compiledTargetCommand(input PlanInput, report PlanReport) string {
 		return report.Investigation.CandidateValidation[0]
 	}
 	return "true"
+}
+
+func applyRuntimeBootstrapPolicy(profile RepoProfile, cmd string) string {
+	if profile.RepoType != "python" {
+		return cmd
+	}
+	if strings.HasPrefix(cmd, ".venv/bin/python ") {
+		return cmd
+	}
+	if strings.HasPrefix(cmd, "python3 -m ") {
+		return strings.Replace(cmd, "python3 -m ", ".venv/bin/python -m ", 1)
+	}
+	if strings.HasPrefix(cmd, "python -m ") {
+		return strings.Replace(cmd, "python -m ", ".venv/bin/python -m ", 1)
+	}
+	if cmd == "pytest" || strings.HasPrefix(cmd, "pytest ") {
+		return strings.Replace(cmd, "pytest", ".venv/bin/python -m pytest", 1)
+	}
+	return cmd
+}
+
+func defaultBootstrapSetup(profile RepoProfile) []SetupStep {
+	if profile.RepoType != "python" {
+		return nil
+	}
+	commands := []string{"python3 -m venv .venv", ".venv/bin/python -m pip install -q --upgrade pip"}
+	switch {
+	case contains(profile.DetectedFiles, "requirements.txt"):
+		commands = append(commands, ".venv/bin/python -m pip install -q -r requirements.txt")
+	case contains(profile.DetectedFiles, "pyproject.toml"):
+		commands = append(commands, ".venv/bin/python -m pip install -q -e .")
+	}
+	return []SetupStep{{
+		Name:    "bootstrap python venv",
+		Command: strings.Join(commands, " && "),
+	}}
 }
 
 func compiledNamePrefix(input PlanInput, profile RepoProfile) string {
