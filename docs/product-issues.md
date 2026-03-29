@@ -278,7 +278,7 @@ Operator manually inspects the evidence chain and narrates confidence in prose.
 This should become a product-level evaluation artifact, not only a human judgment step.
 
 ## AIR-007 — Bug intake still does not compile directly into runnable research execution
-- Status: `new`
+- Status: `validated`
 - Severity: `sev2`
 - Type: `ux`
 - First seen: `2026-03-29`
@@ -292,8 +292,16 @@ Airlock can intake a bug signal via `plan`, but it still does not provide a clea
 
 ### Evidence
 - `airlock plan` produced useful investigation output for `langchain-ai/langchain#36194`
-- execution still requires a manually authored/adapted research contract to proceed into Lima-backed validation
-- this is especially visible for Python repos where VM routing is correct but the top-level intake-to-run path remains operator-heavy
+- prior execution still required a manually authored/adapted research contract to proceed into Lima-backed validation
+- validated fix added:
+  - `airlock intake-compile <repo-path|plan-input.json> [output.json]`
+- real command check:
+  - compiled `langchain-36186-plan-input.json` into a runnable research contract artifact
+  - `research-validate` accepted the generated artifact successfully
+- tests:
+  - `GOTOOLCHAIN=local go test ./internal/research/... -count=1`
+  - `GOTOOLCHAIN=local go test ./cmd/airlock/... -count=1`
+  - `GOTOOLCHAIN=local go test ./... -count=1`
 
 ### User impact
 The product still feels like separate tools rather than one issue-intake-to-fix flow.
@@ -302,10 +310,10 @@ The product still feels like separate tools rather than one issue-intake-to-fix 
 A bug signal should compile into an executable bounded run plan or research contract artifact without manual contract authoring in the common case.
 
 ### Current workaround
-Operator adapts an existing research contract or authors a new one by hand.
+Previously: operator adapts an existing research contract or authors a new one by hand.
 
 ### Notes
-Manual contracts are still acceptable for isolating missing capability, but this gap should be tracked explicitly instead of normalized.
+Fixed by adding an executable intake compiler that emits runnable read-only research contracts from local bug intake. This is an honest bridge, not yet full mutate-contract synthesis.
 
 ## AIR-008 — Compiled research plan can be synthesized against the wrong host repo context
 - Status: `validated`
