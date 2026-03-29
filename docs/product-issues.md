@@ -308,7 +308,7 @@ Operator adapts an existing research contract or authors a new one by hand.
 Manual contracts are still acceptable for isolating missing capability, but this gap should be tracked explicitly instead of normalized.
 
 ## AIR-008 — Compiled research plan can be synthesized against the wrong host repo context
-- Status: `new`
+- Status: `validated`
 - Severity: `sev2`
 - Type: `planner`
 - First seen: `2026-03-29`
@@ -321,10 +321,17 @@ Manual contracts are still acceptable for isolating missing capability, but this
 When validating a research contract, Airlock may synthesize and embed a `plan` using the control-plane working directory instead of the target repo context. This can produce misleading compiled plans with incorrect repo roots, repo types, and candidate commands.
 
 ### Evidence
-- `research-validate` for `langchain-empty-reasoning-36194-research.json` embedded a plan with:
+- prior `research-validate` for `langchain-empty-reasoning-36194-research.json` embedded a plan with:
   - `targetRepo: /Users/varun/repos/airlock`
   - candidate commands like `go test ./libs/core`
 - the actual target repo is `langchain-ai/langchain` subdir `libs/core`
+- validated fix now omits synthesized plans unless a real local `TargetPath` exists
+- tests:
+  - `GOTOOLCHAIN=local go test ./internal/research/... -count=1`
+  - `GOTOOLCHAIN=local go test ./... -count=1`
+- real command check:
+  - `go run ./cmd/airlock research-validate sessions/.../langchain-unclosed-code-block-36186-research.json`
+  - result no longer embeds a bogus compiled `plan`
 
 ### User impact
 Makes compiled artifacts less trustworthy and can mislead operators or future automation layers that consume compiled plan data.
@@ -333,7 +340,7 @@ Makes compiled artifacts less trustworthy and can mislead operators or future au
 If a plan is synthesized during compilation, it should use the intended target repo context or be omitted when that context is unavailable.
 
 ### Current workaround
-Treat the compiled plan as advisory only and rely on the explicitly authored contract for execution.
+Previously: treat the compiled plan as advisory only and rely on the explicitly authored contract for execution.
 
 ### Notes
-This did not block the current run, but it is a real product correctness issue.
+Fixed by only synthesizing a plan during compilation when a real local planning target exists.
