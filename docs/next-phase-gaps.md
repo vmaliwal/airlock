@@ -83,8 +83,8 @@ Recent product/backlog progress since the baseline snapshot:
 Open high-value product gaps still shaping the next phase:
 - `AIR-009` planner-backed autonomous attempt synthesis is still too narrow
 - `AIR-010` top-level issue UX exists, but is still early and operator-incomplete
-- `AIR-002` brittle inline setup shell
-- `AIR-004` host toolchain policy clarity
+- `AIR-013` GitHub draft PR plus reviewer packet output is still missing
+- `AIR-014` private repo auth inside the guest is still missing
 - `AIR-001` Firecracker end-to-end validation
 
 Recently closed Tier 1 product gaps:
@@ -441,25 +441,33 @@ Desired next state:
 Current:
 - powerful CLI primitives exist
 - route-to-VM now reduces some operator burden
+- `airlock fix <github-issue-url>` now exists as the main visible operator loop
 - local bug intake can now compile into runnable read-only research contracts via `airlock intake-compile`
 - local bug intake can now synthesize runnable autofix attempts for supported bug classes via `airlock synthesize`
 
 Gap:
 - mutate-ready plans are synthesized only for narrow supported classes, not in the general case
-- no polished “here is the bug, go work it” top-level flow yet
+- `airlock fix` is still strongest on public GitHub issue URLs and still underpowered on private-repo and richer integration paths
 - summary artifacts are useful but not yet ideal operator UX
 
 Why it matters:
 - the long-term promise is agentic bug fixing, not just a collection of capable subcommands
+- the first commercial wedge is a tight GitHub-first loop, not a broad generic plugin platform
 
 Desired next state:
-- tighter end-to-end task entrypoint
+- a polished GitHub-first flow:
+  - GitHub issue / webhook intake
+  - Airlock fix loop
+  - reviewer packet
+  - draft PR / comment output
 - better auto-scoping, auto-planning, mutation scaffolding, and final summaries
+- generalized multi-integration/plugin architecture only after the GitHub-first loop is proven valuable
 
 ## 10. PR-quality outputs are underdeveloped
 Current:
 - patches and machine-readable summaries exist
 - attempt/campaign artifacts are useful
+- proof-state and advancement artifacts now make evidence much clearer than before
 
 Gap:
 - final reviewer-facing output is still thin
@@ -470,13 +478,15 @@ Gap:
   - fix rationale
   - evidence table
   - residual uncertainty
-  - draft PR body
+  - draft PR body / draft PR creation
 
 Why it matters:
 - real bug fixing ends in something maintainers can consume, not only internal artifacts
+- without a draft PR or PR-grade packet, the fix is commercially much harder to sell
 
 Desired next state:
 - first-class review packet / PR draft generation
+- GitHub-first reviewer output before broader output-adapter/plugin generalization
 
 ## Priority View
 
@@ -495,7 +505,7 @@ Highest-priority gaps for the next phase:
 
 ## Execution Plan
 
-This section translates the roadmap into concrete workstreams. The immediate focus is Priority 0 plus items 1 through 7, with the new no-handcrafted-contract policy enforced throughout.
+This section translates the roadmap into concrete workstreams. Priority 0 plus major portions of items 1 through 7 have now shipped in first form. The immediate focus is now: stronger repair quality, GitHub-first commercialization, eval expansion, and continued Tier 1 validation, with the no-handcrafted-contract policy still enforced throughout.
 
 ### Workstream 0 — Host execution policy enforcement
 Addresses:
@@ -665,9 +675,16 @@ Addresses:
 Deliverables:
 - top-level `fix <bug-signal>` style operator UX
 - contracts become compiled/internal artifacts rather than the main authoring surface
+- near-term commercial path stays GitHub-first:
+  - GitHub issue URL / webhook intake
+  - GitHub auth and local credential handling
+  - private repo support
+  - visible run progress and result publishing
+- defer a broad plugin registry or generic binary-plugin protocol until the GitHub-first loop is proven end-to-end
 
 Success signals:
 - operator burden decreases significantly
+- a single GitHub-first path becomes usable enough for first paying design partners
 
 ### Workstream 10 — PR/reviewer-facing outputs
 Addresses:
@@ -681,9 +698,11 @@ Deliverables:
 - evidence table
 - residual uncertainty
 - draft PR body
+- GitHub draft PR / PR comment creation as the first output target
 
 Success signals:
 - outputs are maintainer-consumable by default
+- the fix becomes externally legible without hand-written operator packaging
 
 ## Real Evidence So Far
 

@@ -452,9 +452,9 @@ A first implementation now exists:
 
 This issue remains open because it still needs:
 - tighter repro inference from issue content beyond the currently recognized command forms
-- stronger PR/draft-output generation
 - richer progress/proof presentation
 - more coverage across real repos
+- better private-repo and authenticated integration support
 - simple distribution via:
   - primary install `go install github.com/vmaliwal/airlock/cmd/airlock@latest`
   - optional convenience installer `install.sh`
@@ -526,3 +526,70 @@ Validated fix:
 - readonly intake-compiled runs now extract bounded issue repro file scaffolding from fenced code blocks when the first line encodes a repo-relative file path (e.g. `// path/to/file_test.go`)
 - that scaffolding is compiled into setup before executing the inferred reproduction command
 - real rerun of `airlock fix https://github.com/elastic/beats/issues/49491` now reports `repro_status: reproduced` instead of `not_reproduced`
+
+## AIR-013 — GitHub draft PR and reviewer packet output are still missing
+- Status: `new`
+- Severity: `sev1`
+- Type: `ux`
+- First seen: `2026-03-30`
+- Reported by: `operator`
+- Source repo: `multiple`
+- Source issue: `n/a`
+- Affected command: `airlock fix <github-issue-url>`
+
+### Problem
+Airlock can now run a materially honest fix loop, but it still stops short of the main artifact humans expect: a draft PR or PR-grade reviewer packet. Without a clear maintainer-facing output, successful work remains hard to review, trust, and monetize.
+
+### Evidence
+- current artifacts include proof state, advancement decision, validation summaries, and patch/checkpoint data
+- `airlock fix` still does not create a GitHub draft PR, PR comment, or polished reviewer packet by default
+- `docs/next-phase-gaps.md` still lists PR/reviewer-facing outputs as an open top-level gap
+
+### User impact
+Blocks the first commercially legible workflow. Even when Airlock does the technical work, the result is still too internal and operator-mediated.
+
+### Expected
+Airlock should produce a GitHub-first review artifact by default:
+- draft PR body or ready-to-post PR packet
+- issue summary
+- reproduction summary
+- root cause
+- fix rationale
+- evidence table
+- residual uncertainty
+
+### Current workaround
+Operator manually converts internal artifacts into a PR description or hand-opens a PR.
+
+### Notes
+Recommendation is to solve this first for GitHub before building a broader output-adapter/plugin system.
+
+## AIR-014 — Private repo auth inside the guest is still missing
+- Status: `new`
+- Severity: `sev1`
+- Type: `runtime`
+- First seen: `2026-03-30`
+- Reported by: `operator`
+- Source repo: `private/enterprise`
+- Source issue: `n/a`
+- Affected command: `airlock fix <github-issue-url>`, VM-backed clone/research/autofix flows
+
+### Problem
+Airlock can clone and validate public repos, but private-repo usage is still blocked because guest-side git/auth setup is not yet first-class. This blocks one of the most important real-world deployment paths for paying teams.
+
+### Evidence
+- current documented flows focus on public GitHub issue URLs and public clone-based validation
+- commercial planning identified lack of private repo auth in the guest as a first-order blocker
+- no first-class guest credential injection path is documented as a validated capability
+
+### User impact
+Blocks design-partner and enterprise-style usage on the repos that matter most.
+
+### Expected
+Airlock should support bounded authenticated private-repo access inside the guest for GitHub-first workflows, with explicit policy and minimal credential exposure.
+
+### Current workaround
+Use public repos only, or manually prepare local trusted checkouts and avoid the intended end-to-end product flow.
+
+### Notes
+Recommendation is to solve this in the GitHub-first commercialization path before generalized multi-integration/plugin architecture.
