@@ -10,10 +10,14 @@ func TestBuildGuestEnv(t *testing.T) {
 		"SSH_AUTH_SOCK": "/tmp/agent.sock",
 		"AWS_PROFILE":   "prod",
 		"FOO":           "bar",
+		"GITHUB_TOKEN":  "ghp_secret",
 	}
-	got := BuildGuestEnv(host, []string{"FOO"})
+	got := BuildGuestEnv(host, []string{"FOO", "GITHUB_TOKEN"})
 	if got["PATH"] != "/usr/bin" || got["LANG"] != "C.UTF-8" || got["FOO"] != "bar" {
 		t.Fatalf("missing expected values: %#v", got)
+	}
+	if got["GITHUB_TOKEN"] != "ghp_secret" {
+		t.Fatalf("expected explicitly allowlisted GITHUB_TOKEN to be preserved: %#v", got)
 	}
 	if _, ok := got["HOME"]; ok {
 		t.Fatal("HOME should be scrubbed")

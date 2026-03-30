@@ -505,6 +505,12 @@ func runFix(issueURL string) {
 		if result.AutofixContractSummary == "" {
 			summary.ValidationScope = proof.ValidationScope
 			summary.FixConfidence = proof.FixConfidence
+			if packetPath, packetErr := research.WriteReviewPacket(result, summary, proof); packetErr == nil {
+				result.ReviewPacketPath = packetPath
+				if draftPath, draftErr := research.WriteDraftPRArtifact(result, summary, proof); draftErr == nil {
+					result.DraftPRPath = draftPath
+				}
+			}
 			appendSummary()
 			fmt.Println(toJSON(result))
 			return
@@ -545,6 +551,14 @@ func runFix(issueURL string) {
 					summary.WinningAttempt = v
 				}
 			}
+		}
+	}
+	if packetPath, packetErr := research.WriteReviewPacket(result, summary, proof); packetErr == nil {
+		result.ReviewPacketPath = packetPath
+		progress("Review packet", "written", true, packetPath)
+		if draftPath, draftErr := research.WriteDraftPRArtifact(result, summary, proof); draftErr == nil {
+			result.DraftPRPath = draftPath
+			progress("Draft PR", "written", true, draftPath)
 		}
 	}
 	appendSummary()

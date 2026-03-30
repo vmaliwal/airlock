@@ -211,6 +211,7 @@ Current `fix` behavior:
 - carries prior-round failure memory into later synthesis rounds
 - avoids previously failed mutation kinds when alternative strategy families exist
 - promotes winning attempts explicitly via a recorded promoted checkpoint
+- emits `review-packet.md` and `draft-pr.md` artifacts for reviewer-facing output
 - prints visible progress and a final JSON result artifact
 
 Autofix/attempt mutations can now use:

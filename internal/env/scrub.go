@@ -28,6 +28,14 @@ func BuildGuestEnv(hostEnv map[string]string, allowed []string) map[string]strin
 		if _, blocked := blocklist[key]; blocked {
 			continue
 		}
+		if _, ok := safeBase[key]; ok {
+			result[key] = value
+			continue
+		}
+		if _, ok := allowedSet[key]; ok {
+			result[key] = value
+			continue
+		}
 		skip := false
 		for _, prefix := range sensitivePrefixes {
 			if strings.HasPrefix(key, prefix) {
@@ -37,13 +45,6 @@ func BuildGuestEnv(hostEnv map[string]string, allowed []string) map[string]strin
 		}
 		if skip {
 			continue
-		}
-		if _, ok := safeBase[key]; ok {
-			result[key] = value
-			continue
-		}
-		if _, ok := allowedSet[key]; ok {
-			result[key] = value
 		}
 	}
 	return result

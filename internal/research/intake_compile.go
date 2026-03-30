@@ -68,7 +68,7 @@ func CompilePlanInputToRunContract(input PlanInput, vmBackend string, allowHostE
 	rc.Airlock.Security.BootstrapAptPackages = bootstrapAptPackagesFor(profile.RepoType)
 	rc.Airlock.Security.Network = base.NetworkAllowlist
 	rc.Airlock.Security.AllowHosts = networkAllowHostsFor(profile.RepoType)
-	rc.Airlock.Security.AllowedEnv = []string{}
+	rc.Airlock.Security.AllowedEnv = compiledAllowedEnv(cloneURL)
 	rc.Airlock.Security.ExportPaths = []string{"/airlock/artifacts"}
 	rc.Airlock.Security.IncludePatch = true
 	rc.Airlock.Steps = []base.Step{{Name: "placeholder", Run: "true"}}
@@ -194,6 +194,14 @@ func networkAllowHostsFor(repoType string) []string {
 	default:
 		return []string{"github.com"}
 	}
+}
+
+func compiledAllowedEnv(cloneURL string) []string {
+	cloneURL = NormalizeCloneURL(cloneURL)
+	if strings.HasPrefix(cloneURL, "https://github.com/") || strings.HasPrefix(cloneURL, "git@github.com:") {
+		return []string{"GITHUB_TOKEN"}
+	}
+	return []string{}
 }
 
 func pintCompiled(v int) *int           { return &v }

@@ -39,6 +39,9 @@ func TestCompilePlanInputToRunContractGoPrefixesToolchainBootstrap(t *testing.T)
 	if len(rc.Airlock.Security.BootstrapAptPackages) == 0 || !contains(rc.Airlock.Security.BootstrapAptPackages, "curl") {
 		t.Fatalf("expected curl bootstrap package for go repo, got %#v", rc.Airlock.Security.BootstrapAptPackages)
 	}
+	if !contains(rc.Airlock.Security.AllowedEnv, "GITHUB_TOKEN") {
+		t.Fatalf("expected github token allowlist for github clone url, got %#v", rc.Airlock.Security.AllowedEnv)
+	}
 }
 
 func TestCompilePlanInputToRunContractPythonSubdir(t *testing.T) {

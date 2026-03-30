@@ -127,8 +127,16 @@ clone_repo() {
   local attempt=1
   while [[ $attempt -le 3 ]]; do
     rm -rf repo
-    if git clone --depth 1 --filter=blob:none %s repo; then
-      return 0
+    if [[ -n "${GITHUB_TOKEN:-}" && "$AIRLOCK_REPO_CLONE_URL" == https://github.com/* ]]; then
+      local auth_header
+      auth_header=$(printf 'x-access-token:%%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')
+      if git -c http.https://github.com/.extraHeader="AUTHORIZATION: basic $auth_header" clone --depth 1 --filter=blob:none %s repo; then
+        return 0
+      fi
+    else
+      if git clone --depth 1 --filter=blob:none %s repo; then
+        return 0
+      fi
     fi
     attempt=$((attempt + 1))
     sleep 3
@@ -198,7 +206,7 @@ summary = {
 }
 (artifacts / 'summary.json').write_text(json.dumps(summary, indent=2))
 PY
-`, strings.Join(envExports, "\n"), includePatch, backend, shellQuote(sandboxName), cloneURL, ref, subdir, bootstrapNetworkMode, strings.Join(bootstrapHosts, " "), strings.Join(bootstrapPackages, " "), networkMode, strings.Join(allowHosts, " "), cloneURL, ref, ref, ref, subdir, subdir, subdir, stepsJSON)
+`, strings.Join(envExports, "\n"), includePatch, backend, shellQuote(sandboxName), cloneURL, ref, subdir, bootstrapNetworkMode, strings.Join(bootstrapHosts, " "), strings.Join(bootstrapPackages, " "), networkMode, strings.Join(allowHosts, " "), cloneURL, cloneURL, ref, ref, ref, subdir, subdir, subdir, stepsJSON)
 }
 
 func stepsJSON(steps []contract.Step) string {

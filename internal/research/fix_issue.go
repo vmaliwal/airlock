@@ -43,6 +43,8 @@ type FixResult struct {
 	AutofixContractSummary string             `json:"autofixContractSummary,omitempty"`
 	AutofixResult          map[string]any     `json:"autofixResult,omitempty"`
 	FixLoop                AutofixLoopSummary `json:"fixLoop,omitempty"`
+	ReviewPacketPath       string             `json:"reviewPacketPath,omitempty"`
+	DraftPRPath            string             `json:"draftPRPath,omitempty"`
 }
 
 func ResolveGitHubIssue(issueURL string) (GitHubIssue, error) {

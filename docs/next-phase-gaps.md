@@ -95,6 +95,10 @@ Recently closed Tier 1 product gaps:
 - canonical run ledger now records credible advancement and verified issue resolution
 - issue-provided repro scaffolding now compiles into readonly `fix` runs for bounded temporary repro files
 
+Fresh progress on the current commercial path:
+- `airlock fix` now emits `review-packet.md` and `draft-pr.md` artifacts for GitHub-first reviewer output
+- guest GitHub clone auth now has a first bounded `GITHUB_TOKEN` allowlist path for intake-compiled GitHub flows
+
 ## Next implementation program: planner-backed autonomous repair
 This is now the primary next workstream.
 
@@ -681,6 +685,11 @@ Deliverables:
   - private repo support
   - visible run progress and result publishing
 - defer a broad plugin registry or generic binary-plugin protocol until the GitHub-first loop is proven end-to-end
+- before adopting OSS tooling for this workstream, evaluate candidate tools against:
+  - whether they accelerate the GitHub-first loop directly
+  - whether they preserve local/cloud parity
+  - whether they add a stable dependency or premature platform surface
+  - whether they can be swapped out later without distorting the core Airlock model
 
 Success signals:
 - operator burden decreases significantly
@@ -699,6 +708,11 @@ Deliverables:
 - residual uncertainty
 - draft PR body
 - GitHub draft PR / PR comment creation as the first output target
+- before adopting OSS tooling for this workstream, evaluate candidate tools against:
+  - whether they reduce implementation risk for GitHub-first output specifically
+  - whether they improve artifact quality without obscuring evidence provenance
+  - whether the dependency is a narrow library choice versus a premature platform commitment
+  - whether Airlock still owns the final packet/PR structure and proof semantics
 
 Success signals:
 - outputs are maintainer-consumable by default

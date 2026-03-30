@@ -528,7 +528,7 @@ Validated fix:
 - real rerun of `airlock fix https://github.com/elastic/beats/issues/49491` now reports `repro_status: reproduced` instead of `not_reproduced`
 
 ## AIR-013 — GitHub draft PR and reviewer packet output are still missing
-- Status: `new`
+- Status: `in_progress`
 - Severity: `sev1`
 - Type: `ux`
 - First seen: `2026-03-30`
@@ -564,8 +564,15 @@ Operator manually converts internal artifacts into a PR description or hand-open
 ### Notes
 Recommendation is to solve this first for GitHub before building a broader output-adapter/plugin system.
 
+Progress now shipped:
+- `airlock fix` writes a maintainer-oriented `review-packet.md`
+- `airlock fix` also writes a first `draft-pr.md` artifact for GitHub-first reviewer output
+- these artifacts surface directly in `FixResult` as `reviewPacketPath` and `draftPRPath`
+
+This issue remains open because automated GitHub draft PR creation/posting is still not implemented.
+
 ## AIR-014 — Private repo auth inside the guest is still missing
-- Status: `new`
+- Status: `in_progress`
 - Severity: `sev1`
 - Type: `runtime`
 - First seen: `2026-03-30`
@@ -593,3 +600,10 @@ Use public repos only, or manually prepare local trusted checkouts and avoid the
 
 ### Notes
 Recommendation is to solve this in the GitHub-first commercialization path before generalized multi-integration/plugin architecture.
+
+Progress now shipped:
+- guest env scrubbing now preserves explicitly allowlisted sensitive vars instead of dropping them unconditionally
+- intake-compiled GitHub clone flows now allowlist `GITHUB_TOKEN`
+- guest clone scripts now use bounded GitHub HTTPS auth when `GITHUB_TOKEN` is present and the clone target is `https://github.com/...`
+
+This issue remains open because the end-to-end private-repo story still needs broader coverage beyond clone auth, including authenticated fetch/push paths and clearer credential lifecycle policy.

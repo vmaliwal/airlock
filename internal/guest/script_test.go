@@ -27,6 +27,7 @@ func TestBuildScriptContainsIsolationDefaults(t *testing.T) {
 		"BOOTSTRAP_APT_PACKAGES=('git' 'ca-certificates')",
 		"sudo apt-get update",
 		"git clone --depth 1 --filter=blob:none 'https://github.com/elastic/beats.git' repo",
+		"git -c http.https://github.com/.extraHeader=\"AUTHORIZATION: basic $auth_header\" clone --depth 1 --filter=blob:none 'https://github.com/elastic/beats.git' repo",
 		"sudo iptables -P OUTPUT DROP",
 		"FOO='bar'",
 	}
