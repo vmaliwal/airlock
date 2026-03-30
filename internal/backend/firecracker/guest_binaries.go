@@ -63,12 +63,20 @@ func buildGuestBinary(spec guestBinarySpec) error {
 	}
 	_, err := util.RunLocal("go", []string{"build", "-o", spec.HostPath, pkg}, util.RunOptions{
 		Cwd: repoRoot(),
-		Env: append(os.Environ(), "GOOS=linux", "GOARCH="+goarch, "CGO_ENABLED=0", "GOTOOLCHAIN=local"),
+		Env: guestBuildEnv(goarch),
 	})
 	if err != nil {
 		return fmt.Errorf("build %s guest binary: %w", spec.Name, err)
 	}
 	return nil
+}
+
+func guestBuildEnv(goarch string) []string {
+	toolchain := os.Getenv("GOTOOLCHAIN")
+	if toolchain == "" {
+		toolchain = "auto"
+	}
+	return append(os.Environ(), "GOOS=linux", "GOARCH="+goarch, "CGO_ENABLED=0", "GOTOOLCHAIN="+toolchain)
 }
 
 func repoRoot() string {

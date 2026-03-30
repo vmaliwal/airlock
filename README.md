@@ -181,6 +181,17 @@ It measures things like:
 - top-1 / top-3 mutation-kind hits when expectations are provided
 - optional local autofix execution on trusted/local eval fixtures
 
+Run-level metrics:
+```bash
+./airlock metrics
+./airlock metrics /path/to/runs.jsonl
+```
+
+Current metrics ledger and scorecards include:
+- credible advancement rate
+- verified issue resolution rate
+- repo / customer / global aggregation from append-only `runs.jsonl`
+
 ## Run the top-level issue flow
 
 ```bash
@@ -191,9 +202,15 @@ Current `fix` behavior:
 - resolves a public GitHub issue
 - clones the repo locally for inspection/planning
 - infers a failing command when possible from the issue body
+- compiles bounded issue-provided repro scaffolding for readonly runs when the issue body includes a temporary repro file snippet
 - performs a read-only VM reproduction run when a command is available
+- records truthful reproduction state (`reproduced`, `not_reproduced`, `infra_failure`, `bootstrap_failure`, `env_blocked`)
 - synthesizes candidate fixes
-- executes autofix attempts through the VM-backed path when policy requires it
+- runs a bounded multi-round fix loop
+- suppresses duplicate attempts across rounds
+- carries prior-round failure memory into later synthesis rounds
+- avoids previously failed mutation kinds when alternative strategy families exist
+- promotes winning attempts explicitly via a recorded promoted checkpoint
 - prints visible progress and a final JSON result artifact
 
 Autofix/attempt mutations can now use:

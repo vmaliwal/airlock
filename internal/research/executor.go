@@ -62,18 +62,26 @@ func ExecuteRunContract(c RunContract, repoRoot, artifactsDir string) error {
 	if err != nil {
 		return err
 	}
-	reproProof := deriveReadOnlyProofState(reproEval)
+	reproProof := deriveReadOnlyProofState(reproRuns, reproEval)
 	if err := writeJSON(filepath.Join(artifactsDir, "reproduction-results.json"), map[string]any{"runs": reproRuns, "evaluation": reproEval, "fingerprints": reproFPS, "repro_status": reproProof.ReproStatus}); err != nil {
 		return err
+	}
+	if err := writeJSON(filepath.Join(artifactsDir, "proof-state.json"), reproProof); err != nil {
+		return err
+	}
+	readOnlyDecision := DecideAdvancement(reproProof, false, false, false)
+	if err := writeJSON(filepath.Join(artifactsDir, "advancement-decision.json"), readOnlyDecision); err != nil {
+		return err
+	}
+	if reproProof.ReproStatus != ReproStatusReproduced {
+		_ = writeText(filepath.Join(artifactsDir, "outcome.md"), fmt.Sprintf("# Outcome\n\nSuccess: false\n\n## Proof state\n- repro_status: %s\n- validation_scope: %s\n- fix_confidence: %s\n- confidence_reason: %s\n", reproProof.ReproStatus, reproProof.ValidationScope, reproProof.FixConfidence, reproProof.ConfidenceReason))
+		return fmt.Errorf("reproduction not established: %s", reproProof.ReproStatus)
 	}
 	if !reproEval.Passed {
 		_ = writeText(filepath.Join(artifactsDir, "outcome.md"), "# Outcome\n\nSuccess: false\n\nReason: reproduction criteria not met\n")
 		return fmt.Errorf("reproduction criteria not met")
 	}
 	if c.Mode == "read_only" {
-		if err := writeJSON(filepath.Join(artifactsDir, "proof-state.json"), reproProof); err != nil {
-			return err
-		}
 		return writeText(filepath.Join(artifactsDir, "outcome.md"), fmt.Sprintf("# Outcome\n\nRead-only run complete.\n\n## Proof state\n- repro_status: %s\n- validation_scope: %s\n- fix_confidence: %s\n- confidence_reason: %s\n", reproProof.ReproStatus, reproProof.ValidationScope, reproProof.FixConfidence, reproProof.ConfidenceReason))
 	}
 
@@ -190,8 +198,9 @@ func ExecuteRunContract(c RunContract, repoRoot, artifactsDir string) error {
 			return fmt.Errorf("no improvement")
 		}
 		if valEval.Passed && neighborEval.Passed && broaderPassed && campaignEval.Passed {
-			proof := deriveMutateProofState(reproEval, valEval, neighborEval, broaderPassed, campaignEval.Passed, neighborRun != nil, len(broaderRuns), c.Campaign != nil)
-			payload := map[string]any{"attempt": i + 1, "patch": patch.Name, "diffStats": diff, "validationRuns": valRuns, "validationEval": valEval, "validationFingerprints": valFPS, "broaderRuns": broaderRuns, "campaignResult": campaignResult, "campaignEval": campaignEval, "repro_status": proof.ReproStatus, "validation_scope": proof.ValidationScope, "fix_confidence": proof.FixConfidence, "confidence_reason": proof.ConfidenceReason}
+			proof := deriveMutateProofState(reproRuns, reproEval, valEval, neighborEval, broaderPassed, campaignEval.Passed, neighborRun != nil, len(broaderRuns), c.Campaign != nil)
+			decision := DecideAdvancement(proof, true, true, false)
+			payload := map[string]any{"attempt": i + 1, "patch": patch.Name, "diffStats": diff, "validationRuns": valRuns, "validationEval": valEval, "validationFingerprints": valFPS, "broaderRuns": broaderRuns, "campaignResult": campaignResult, "campaignEval": campaignEval, "repro_status": proof.ReproStatus, "validation_scope": proof.ValidationScope, "fix_confidence": proof.FixConfidence, "confidence_reason": proof.ConfidenceReason, "credible_advancement": decision.CredibleAdvancement, "verified_issue_resolution": decision.VerifiedIssueResolution}
 			if neighborRun != nil {
 				payload["neighborRun"] = neighborRun
 				payload["neighborEval"] = neighborEval
@@ -202,7 +211,10 @@ func ExecuteRunContract(c RunContract, repoRoot, artifactsDir string) error {
 			if err := writeJSON(filepath.Join(artifactsDir, "proof-state.json"), proof); err != nil {
 				return err
 			}
-			if err := writeText(filepath.Join(artifactsDir, "outcome.md"), fmt.Sprintf("# Outcome\n\nSuccess: true\n\n## Proof state\n- repro_status: %s\n- validation_scope: %s\n- fix_confidence: %s\n- confidence_reason: %s\n", proof.ReproStatus, proof.ValidationScope, proof.FixConfidence, proof.ConfidenceReason)); err != nil {
+			if err := writeJSON(filepath.Join(artifactsDir, "advancement-decision.json"), decision); err != nil {
+				return err
+			}
+			if err := writeText(filepath.Join(artifactsDir, "outcome.md"), fmt.Sprintf("# Outcome\n\nSuccess: true\n\n## Proof state\n- repro_status: %s\n- validation_scope: %s\n- fix_confidence: %s\n- confidence_reason: %s\n\n## Advancement\n- should_advance: %t\n- credible_advancement: %t\n- verified_issue_resolution: %t\n- reason: %s\n", proof.ReproStatus, proof.ValidationScope, proof.FixConfidence, proof.ConfidenceReason, decision.ShouldAdvance, decision.CredibleAdvancement, decision.VerifiedIssueResolution, decision.Reason)); err != nil {
 				return err
 			}
 			success = true
@@ -212,9 +224,11 @@ func ExecuteRunContract(c RunContract, repoRoot, artifactsDir string) error {
 	if success {
 		return nil
 	}
-	proof := deriveMutateProofState(reproEval, EvaluationResult{Passed: false}, EvaluationResult{Passed: false}, false, false, c.Validation.NeighborCommand != "", 0, c.Campaign != nil)
+	proof := deriveMutateProofState(reproRuns, reproEval, EvaluationResult{Passed: false}, EvaluationResult{Passed: false}, false, false, c.Validation.NeighborCommand != "", 0, c.Campaign != nil)
+	decision := DecideAdvancement(proof, true, false, false)
 	_ = writeJSON(filepath.Join(artifactsDir, "proof-state.json"), proof)
-	return writeText(filepath.Join(artifactsDir, "outcome.md"), fmt.Sprintf("# Outcome\n\nSuccess: false\n\n## Proof state\n- repro_status: %s\n- validation_scope: %s\n- fix_confidence: %s\n- confidence_reason: %s\n", proof.ReproStatus, proof.ValidationScope, proof.FixConfidence, proof.ConfidenceReason))
+	_ = writeJSON(filepath.Join(artifactsDir, "advancement-decision.json"), decision)
+	return writeText(filepath.Join(artifactsDir, "outcome.md"), fmt.Sprintf("# Outcome\n\nSuccess: false\n\n## Proof state\n- repro_status: %s\n- validation_scope: %s\n- fix_confidence: %s\n- confidence_reason: %s\n\n## Advancement\n- should_advance: %t\n- credible_advancement: %t\n- verified_issue_resolution: %t\n- reason: %s\n", proof.ReproStatus, proof.ValidationScope, proof.FixConfidence, proof.ConfidenceReason, decision.ShouldAdvance, decision.CredibleAdvancement, decision.VerifiedIssueResolution, decision.Reason))
 }
 
 func runPhase(repo, cmd string, timeout time.Duration) (CommandResult, error) {

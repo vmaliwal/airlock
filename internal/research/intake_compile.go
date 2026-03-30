@@ -45,7 +45,7 @@ func CompilePlanInputToRunContract(input PlanInput, vmBackend string, allowHostE
 	rc.Objective = objective
 	rc.Mode = "read_only"
 	rc.HostExecutionException = allowHostExecution
-	rc.Setup = defaultBootstrapSetup(profile)
+	rc.Setup = append(issueReproSetupSteps(input), defaultBootstrapSetup(profile)...)
 	rc.Reproduction = Phase{Command: cmd, Repeat: 1, Success: SuccessRule{MinFailures: pintCompiled(1)}}
 	rc.Validation = ValidationSpec{
 		TargetCommand: cmd,
@@ -112,22 +112,26 @@ func compiledTargetCommand(input PlanInput, report PlanReport) string {
 }
 
 func applyRuntimeBootstrapPolicy(profile RepoProfile, cmd string) string {
-	if profile.RepoType != "python" {
+	switch profile.RepoType {
+	case "python":
+		if strings.HasPrefix(cmd, ".venv/bin/python ") {
+			return cmd
+		}
+		if strings.HasPrefix(cmd, "python3 -m ") {
+			return strings.Replace(cmd, "python3 -m ", ".venv/bin/python -m ", 1)
+		}
+		if strings.HasPrefix(cmd, "python -m ") {
+			return strings.Replace(cmd, "python -m ", ".venv/bin/python -m ", 1)
+		}
+		if cmd == "pytest" || strings.HasPrefix(cmd, "pytest ") {
+			return strings.Replace(cmd, "pytest", ".venv/bin/python -m pytest", 1)
+		}
+		return cmd
+	case "go":
+		return applyBootstrapPrefix(cmd, goToolchainBootstrapCommand(profile))
+	default:
 		return cmd
 	}
-	if strings.HasPrefix(cmd, ".venv/bin/python ") {
-		return cmd
-	}
-	if strings.HasPrefix(cmd, "python3 -m ") {
-		return strings.Replace(cmd, "python3 -m ", ".venv/bin/python -m ", 1)
-	}
-	if strings.HasPrefix(cmd, "python -m ") {
-		return strings.Replace(cmd, "python -m ", ".venv/bin/python -m ", 1)
-	}
-	if cmd == "pytest" || strings.HasPrefix(cmd, "pytest ") {
-		return strings.Replace(cmd, "pytest", ".venv/bin/python -m pytest", 1)
-	}
-	return cmd
 }
 
 func defaultBootstrapSetup(profile RepoProfile) []SetupStep {
@@ -192,5 +196,5 @@ func networkAllowHostsFor(repoType string) []string {
 	}
 }
 
-func pintCompiled(v int) *int { return &v }
+func pintCompiled(v int) *int           { return &v }
 func pfloatCompiled(v float64) *float64 { return &v }

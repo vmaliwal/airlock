@@ -144,12 +144,27 @@ Autofix and planning learning:
 - `airlock fix <github-issue-url>` now exists as the first top-level visible operator path:
   - resolve issue
   - clone repo
+  - compile bounded issue repro scaffolding when the issue body provides a temporary repro file snippet
   - attempt readonly reproduction when a command can be inferred
   - synthesize bounded attempts
-  - run autofix
+  - run a bounded multi-round autofix loop
+  - suppress duplicate attempts across rounds
+  - carry prior-round failure memory into later rounds
+  - avoid previously failed mutation kinds when alternatives exist
+  - promote winning attempts explicitly and record the promoted checkpoint
   - return artifacts and visible progress
-- this is the first step toward the intended planner loop:
-  - repro/fingerprint/context -> candidate attempts -> autofix execution -> proof state
+- readonly proof now distinguishes:
+  - `reproduced`
+  - `not_reproduced`
+  - `infra_failure`
+  - `bootstrap_failure`
+  - `env_blocked`
+- run summaries are now appended to a canonical metrics ledger and aggregated into:
+  - credible advancement rate
+  - verified issue resolution rate
+  - repo / customer / global scorecards
+- this is the first real operating loop rather than a one-pass batch:
+  - repro/fingerprint/context -> candidate attempts -> bounded rounds -> winner promotion -> proof state
 - the next planned slice is broader planner eval coverage and more real OSS validation through `airlock fix`
 - `airlock plan` now ranks mutation families using:
   - repo-type defaults

@@ -21,6 +21,7 @@ type AttemptSpec struct {
 
 type AttemptOutcome struct {
 	Name                   string               `json:"name"`
+	MutationKind           string               `json:"mutationKind,omitempty"`
 	BaseSHA                string               `json:"baseSha"`
 	Mutation               CommandResult        `json:"mutation"`
 	DiffStats              GitDiffStats         `json:"diffStats"`

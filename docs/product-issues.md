@@ -451,7 +451,7 @@ A first implementation now exists:
 - `airlock fix <github-issue-url>` resolves the issue, clones the repo, attempts readonly reproduction when it can infer a command, synthesizes candidate fixes, executes autofix, and prints visible progress
 
 This issue remains open because it still needs:
-- tighter repro inference from issue content
+- tighter repro inference from issue content beyond the currently recognized command forms
 - stronger PR/draft-output generation
 - richer progress/proof presentation
 - more coverage across real repos
@@ -459,3 +459,70 @@ This issue remains open because it still needs:
   - primary install `go install github.com/vmaliwal/airlock/cmd/airlock@latest`
   - optional convenience installer `install.sh`
   - explicitly no Homebrew path for now
+
+## AIR-011 — VM helper binary builds are pinned to local Go toolchain
+- Status: `validated`
+- Severity: `sev1`
+- Type: `runtime`
+- First seen: `2026-03-29`
+- Reported by: `repo validation`
+- Source repo: `elastic/beats`
+- Source issue: `#49491`
+- Affected command: `airlock fix <github-issue-url>`, VM-backed `autofix-run` / `research-run`
+
+### Problem
+When Airlock routes into a VM-backed path that requires building helper binaries like `/tmp/airlock` or `/tmp/airlock-researchguest`, the host-side build still forces `GOTOOLCHAIN=local`. If the locally installed Go is older than Airlock's own module requirement, VM execution fails before reproduction starts.
+
+### Evidence
+- real `airlock fix https://github.com/elastic/beats/issues/49491` run reached VM routing, then failed with:
+  - `go.mod requires go >= 1.23.0 (running go 1.21.3; GOTOOLCHAIN=local)`
+- failure occurred while building `./cmd/researchguest` for Lima guest injection
+
+### User impact
+Breaks the top-level issue flow and any VM-backed execution path on hosts whose default Go install is older than the repo's required toolchain, even when the operator otherwise has `GOTOOLCHAIN=auto` available.
+
+### Expected
+Airlock should build its own guest helper binaries using a toolchain policy consistent with the main CLI invocation, rather than hard-pinning to an older local toolchain.
+
+### Current workaround
+Upgrade the host's installed Go manually so `GOTOOLCHAIN=local` is sufficient.
+
+### Notes
+This is a real product/runtime regression exposed by the new Go 1.23 planner dependency and the new `airlock fix` path.
+
+## AIR-012 — Issue-provided repro scaffolding is ignored in readonly fix runs
+- Status: `validated`
+- Severity: `sev1`
+- Type: `runtime`
+- First seen: `2026-03-30`
+- Reported by: `repo validation`
+- Source repo: `elastic/beats`
+- Source issue: `#49491`
+- Affected command: `airlock fix <github-issue-url>`
+
+### Problem
+`airlock fix` can infer a failing command from an issue body, but it currently ignores issue-provided repro scaffolding such as temporary test files or setup snippets that must exist before the command becomes meaningful. As a result, readonly reproduction may execute successfully yet honestly report `not_reproduced` because the issue's minimal repro fixture was never materialized.
+
+### Evidence
+- real rerun of `airlock fix https://github.com/elastic/beats/issues/49491`
+- readonly VM path correctly bootstrapped Go after the recent runtime fix
+- reproduction command ran successfully, but output showed `ok ... [no tests to run]`
+- issue body explicitly instructed Airlock to create `libbeat/common/kafka/zzz_repro_test.go` before running the test command
+- resulting repro artifact reported `repro_status: not_reproduced`
+
+### User impact
+Blocks honest top-level reproduction on issues that include inline minimal repro files, especially bug-hunter style reports and issues that provide a temporary failing test snippet.
+
+### Expected
+Readonly issue runs should compile bounded repro scaffolding from the issue body into setup steps before executing the inferred reproduction command.
+
+### Current workaround
+Hand-author a readonly research contract or manually create the repro file before running the command.
+
+### Notes
+This is narrower than general planner autonomy. The immediate need is bounded support for issue-provided temporary repro files, not freeform issue execution.
+
+Validated fix:
+- readonly intake-compiled runs now extract bounded issue repro file scaffolding from fenced code blocks when the first line encodes a repo-relative file path (e.g. `// path/to/file_test.go`)
+- that scaffolding is compiled into setup before executing the inferred reproduction command
+- real rerun of `airlock fix https://github.com/elastic/beats/issues/49491` now reports `repro_status: reproduced` instead of `not_reproduced`

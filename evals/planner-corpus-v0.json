@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "name": "beats-kafka-alias-49491",
+      "input": {
+        "repoPath": "/Users/varun/repos/experiments/beats",
+        "issueUrl": "https://github.com/elastic/beats/issues/49491",
+        "failingCommand": "go test ./libbeat/common/kafka -run TestKafkaAlias -count=1",
+        "failureText": "expected V4_1_0_0, got V4_0_0_0",
+        "notes": "test failure: TestKafkaAlias"
+      },
+      "expectedSupported": true,
+      "expectedMutationKinds": ["replace_line"]
+    },
+    {
+      "name": "langchain-unclosed-code-block-36186",
+      "input": {
+        "repoPath": "/Users/varun/repos/experiments/langchain/libs/text-splitters",
+        "issueUrl": "https://github.com/langchain-ai/langchain/issues/36186",
+        "failingCommand": ".venv/bin/python -m pytest tests/unit_tests/test_text_splitters.py -k unclosed_code_block",
+        "failureText": "ExperimentalMarkdownSyntaxTextSplitter silently discards content from unclosed code blocks",
+        "notes": "_resolve_code_chunk returns empty string instead of accumulated chunk when closing fence is missing"
+      },
+      "expectedSupported": true,
+      "expectedMutationKinds": ["replace_line"]
+    },
+    {
+      "name": "langchain-empty-reasoning-36194",
+      "input": {
+        "repoPath": "/Users/varun/repos/.autoresearch-worktrees/langchain-empty-reasoning-36194/libs/core",
+        "issueUrl": "https://github.com/langchain-ai/langchain/issues/36194",
+        "failingCommand": ".venv/bin/python -m pytest tests/unit_tests/messages/block_translators/test_groq.py -k empty_string",
+        "failureText": "_extract_reasoning_from_additional_kwargs should ignore empty strings in reasoning_content",
+        "notes": "empty string reasoning_content should not produce a reasoning block"
+      },
+      "expectedSupported": true,
+      "expectedMutationKinds": ["search_replace"]
+    },
+    {
+      "name": "gum-spin-errors-1017",
+      "input": {
+        "repoPath": "/Users/varun/repos/experiments/gum",
+        "issueUrl": "https://github.com/charmbracelet/gum/issues/1017",
+        "failingCommand": "go test ./spin -count=1",
+        "failureText": "gum spin sometimes loses error output from commands",
+        "notes": "buffer reset and goroutine drain bug"
+      },
+      "expectedSupported": false,
+      "expectedMutationKinds": []
+    },
+    {
+      "name": "cli-project-scope-error-12585",
+      "input": {
+        "repoPath": "/Users/varun/repos/experiments/cli",
+        "issueUrl": "https://github.com/cli/cli/issues/12585",
+        "failingCommand": "go test ./pkg/cmd/issue/create -run TestIssueCreate_projectV2InsufficientScopesShowsRefreshHint -count=1",
+        "failureText": "issue create leaks raw GraphQL INSUFFICIENT_SCOPES instead of refresh guidance",
+        "notes": "expected normalized user-facing scope refresh error"
+      },
+      "expectedSupported": false,
+      "expectedMutationKinds": []
+    }
+  ]
+}

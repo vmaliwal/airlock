@@ -28,6 +28,7 @@ type SynthesisReport struct {
 }
 
 func SynthesizeAutofixPlan(input PlanInput, vmBackend string, allowHostExecution bool) (SynthesisReport, error) {
+	avoidKinds := avoidMutationKinds(input)
 	report, err := PlanFromInput(input, vmBackend, allowHostExecution)
 	if err != nil {
 		return SynthesisReport{}, err
@@ -46,6 +47,7 @@ func SynthesizeAutofixPlan(input PlanInput, vmBackend string, allowHostExecution
 	} else {
 		attempts, summary = synthesizeAttemptsForInput(input, profile, validationCmd)
 	}
+	attempts = filterSynthesizedAttempts(attempts, avoidKinds)
 	resp := SynthesisReport{
 		Input:         input,
 		Investigation: report.Investigation,
@@ -91,12 +93,20 @@ func synthesizeGoAttempts(input PlanInput, profile RepoProfile, validationCmd st
 	expected, got, ok := parseExpectedGotPair(failure)
 	if ok {
 		if rel, line, found := findFileLineContaining(profile.TargetPath, got); found {
+			newLine := strings.Replace(line, got, expected, 1)
 			attempts = append(attempts, SynthesizedAttempt{
 				Name:         "normalize mismatched expected value",
 				MutationKind: "replace_line",
 				Confidence:   "medium",
 				Rationale:    "failure text provides an expected/got pair and the target repo contains the observed value on a bounded line",
-				Attempt:      AttemptFile{Attempt: AttemptSpec{Name: "normalize-mismatched-expected-value", CommitMessage: "attempt: normalize mismatched expected value", Validation: Phase{Command: validationCmd, Repeat: 1, Success: SuccessRule{ExitCode: pintCompiled(0), MinPassRate: pfloatCompiled(1.0), MaxFailures: pintCompiled(0)}}, Safety: SafetyBudget{MaxFilesChanged: 1, MaxLocChanged: 10, AllowedPaths: []string{rel}}}, Mutation: MutationSpec{ReplaceLine: &ReplaceLineMutation{Path: rel, OldLine: line, NewLine: strings.Replace(line, got, expected, 1)}}},
+				Attempt:      AttemptFile{Attempt: AttemptSpec{Name: "normalize-mismatched-expected-value", CommitMessage: "attempt: normalize mismatched expected value", Validation: Phase{Command: validationCmd, Repeat: 1, Success: SuccessRule{ExitCode: pintCompiled(0), MinPassRate: pfloatCompiled(1.0), MaxFailures: pintCompiled(0)}}, Safety: SafetyBudget{MaxFilesChanged: 1, MaxLocChanged: 10, AllowedPaths: []string{rel}}}, Mutation: MutationSpec{ReplaceLine: &ReplaceLineMutation{Path: rel, OldLine: line, NewLine: newLine}}},
+			})
+			attempts = append(attempts, SynthesizedAttempt{
+				Name:         "search replace mismatched expected value",
+				MutationKind: "search_replace",
+				Confidence:   "low",
+				Rationale:    "fallback variant of the same bounded repair using search_replace so later rounds can switch mutation families",
+				Attempt:      AttemptFile{Attempt: AttemptSpec{Name: "search-replace-mismatched-expected-value", CommitMessage: "attempt: search replace mismatched expected value", Validation: Phase{Command: validationCmd, Repeat: 1, Success: SuccessRule{ExitCode: pintCompiled(0), MinPassRate: pfloatCompiled(1.0), MaxFailures: pintCompiled(0)}}, Safety: SafetyBudget{MaxFilesChanged: 1, MaxLocChanged: 10, AllowedPaths: []string{rel}}}, Mutation: MutationSpec{SearchReplace: &SearchReplaceMutation{Path: rel, OldText: line, NewText: newLine}}},
 			})
 		}
 	}

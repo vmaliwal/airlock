@@ -34,14 +34,15 @@ type FixProgressEvent struct {
 }
 
 type FixResult struct {
-	Issue                  GitHubIssue     `json:"issue"`
-	RepoPath               string          `json:"repoPath"`
-	PlanInput              PlanInput       `json:"planInput"`
-	ReadonlySummaryPath    string          `json:"readonlySummaryPath,omitempty"`
-	ReproductionResults    map[string]any  `json:"reproductionResults,omitempty"`
-	Synthesis              SynthesisReport `json:"synthesis"`
-	AutofixContractSummary string          `json:"autofixContractSummary,omitempty"`
-	AutofixResult          map[string]any  `json:"autofixResult,omitempty"`
+	Issue                  GitHubIssue        `json:"issue"`
+	RepoPath               string             `json:"repoPath"`
+	PlanInput              PlanInput          `json:"planInput"`
+	ReadonlySummaryPath    string             `json:"readonlySummaryPath,omitempty"`
+	ReproductionResults    map[string]any     `json:"reproductionResults,omitempty"`
+	Synthesis              SynthesisReport    `json:"synthesis"`
+	AutofixContractSummary string             `json:"autofixContractSummary,omitempty"`
+	AutofixResult          map[string]any     `json:"autofixResult,omitempty"`
+	FixLoop                AutofixLoopSummary `json:"fixLoop,omitempty"`
 }
 
 func ResolveGitHubIssue(issueURL string) (GitHubIssue, error) {

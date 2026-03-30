@@ -1,0 +1,72 @@
+{
+  "startedAt": "2026-03-29T09:27:54Z",
+  "finishedAt": "2026-03-29T09:28:02Z",
+  "caseCount": 5,
+  "supportedCount": 3,
+  "schemaValidCount": 5,
+  "top1MeasuredCount": 3,
+  "top1HitCount": 3,
+  "top3MeasuredCount": 3,
+  "top3HitCount": 3,
+  "autofixMeasuredCount": 0,
+  "autofixSuccessCount": 0,
+  "results": [
+    {
+      "name": "beats-kafka-alias-49491",
+      "supported": true,
+      "schemaValid": true,
+      "attemptCount": 1,
+      "top1MutationKind": "replace_line",
+      "top3Kinds": [
+        "replace_line"
+      ],
+      "expectedKinds": [
+        "replace_line"
+      ],
+      "top1Hit": true,
+      "top3Hit": true
+    },
+    {
+      "name": "langchain-unclosed-code-block-36186",
+      "supported": true,
+      "schemaValid": true,
+      "attemptCount": 1,
+      "top1MutationKind": "replace_line",
+      "top3Kinds": [
+        "replace_line"
+      ],
+      "expectedKinds": [
+        "replace_line"
+      ],
+      "top1Hit": true,
+      "top3Hit": true
+    },
+    {
+      "name": "langchain-empty-reasoning-36194",
+      "supported": true,
+      "schemaValid": true,
+      "attemptCount": 1,
+      "top1MutationKind": "search_replace",
+      "top3Kinds": [
+        "search_replace"
+      ],
+      "expectedKinds": [
+        "search_replace"
+      ],
+      "top1Hit": true,
+      "top3Hit": true
+    },
+    {
+      "name": "gum-spin-errors-1017",
+      "supported": false,
+      "schemaValid": true,
+      "attemptCount": 0
+    },
+    {
+      "name": "cli-project-scope-error-12585",
+      "supported": false,
+      "schemaValid": true,
+      "attemptCount": 0
+    }
+  ]
+}

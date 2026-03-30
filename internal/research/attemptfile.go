@@ -285,6 +285,7 @@ func RunAttemptFile(c AttemptFile) (AttemptOutcome, error) {
 	if err != nil {
 		return outcome, err
 	}
+	outcome.MutationKind = MutationKind(c.Mutation, c.Attempt)
 	_ = AppendLesson(filepath.Join(c.ArtifactsDir, "lessons.jsonl"), LessonRecord{
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
 		Repo:         c.Repo,

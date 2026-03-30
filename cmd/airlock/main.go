@@ -76,6 +76,12 @@ func main() {
 			os.Exit(1)
 		}
 		runFix(os.Args[2])
+	case "metrics":
+		path := ""
+		if len(os.Args) >= 3 {
+			path = os.Args[2]
+		}
+		runMetrics(path)
 	case "preflight":
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "usage: airlock preflight <repo-path>")
@@ -143,7 +149,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Println("usage: airlock <check|probe|investigate|plan|intake-compile|synthesize|eval-planner|fix|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
+	fmt.Println("usage: airlock <check|probe|investigate|plan|intake-compile|synthesize|eval-planner|fix|metrics|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
 }
 
 func runCheck() {
@@ -327,91 +333,237 @@ func runFix(issueURL string) {
 		fmt.Fprintf(os.Stderr, "%s %s... %s\n", status, stage, msg)
 	}
 	start := time.Now()
-	progress("Resolve issue", issueURL, false, "")
-	issue, err := research.ResolveGitHubIssue(issueURL)
-	if err != nil {
+	summary := research.RunSummary{
+		RunID:          research.NewRunID("fix"),
+		Timestamp:      start.UTC().Format(time.RFC3339),
+		CustomerID:     research.CurrentCustomerID(),
+		Entrypoint:     "fix",
+		AirlockVersion: research.AirlockVersion(),
+		IssueKey:       issueURL,
+		RoundCount:     1,
+	}
+	appendSummary := func() {
+		summary.DurationSeconds = int64(time.Since(start).Seconds())
+		if err := research.AppendRunSummary(summary); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: append run summary: %v\n", err)
+		}
+	}
+	fail := func(category string, err error) {
+		summary.FailureCategory = category
+		appendSummary()
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	progress("Resolve issue", issue.Title, true, fmt.Sprintf("%s/%s#%d", issue.Owner, issue.Repo, issue.Number))
+	progress("Resolve issue", issueURL, false, "")
+	issue, err := research.ResolveGitHubIssue(issueURL)
+	if err != nil {
+		fail("issue_resolution_failed", err)
+	}
+	summary.RepoKey = fmt.Sprintf("%s/%s", issue.Owner, issue.Repo)
+	summary.IssueKey = fmt.Sprintf("%s/%s#%d", issue.Owner, issue.Repo, issue.Number)
+	progress("Resolve issue", issue.Title, true, summary.IssueKey)
 	progress("Clone repo", issue.CloneURL, false, "")
 	repoPath, err := research.CloneIssueRepo(issue)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fail("clone_failed", err)
 	}
 	progress("Clone repo", repoPath, true, "")
 	input := research.BuildPlanInputFromIssue(issue, repoPath)
 	backend := ""
 	if kind, err := selectAutoVMBackend(); err == nil {
 		backend = string(kind)
+		summary.Backend = backend
 		progress("Route to VM", string(kind), true, "")
 	}
+	if sha, err := research.GitHeadSHA(repoPath); err == nil {
+		summary.RepoSHA = sha
+	}
 	result := research.FixResult{Issue: issue, RepoPath: repoPath, PlanInput: input}
-	progress("Reproduce bug", input.FailingCommand, false, "readonly VM run")
+	proof := research.ProofState{ReproStatus: research.ReproStatusNotReproduced, ValidationScope: "target_only", FixConfidence: "none"}
 	if input.FailingCommand != "" {
+		progress("Reproduce bug", input.FailingCommand, false, "readonly VM run")
 		rc, err := research.CompilePlanInputToRunContract(input, backend, research.HostExecutionExceptionDeclared())
-		if err == nil {
-			compiled, cerr := research.CompileRunContract(rc)
-			if cerr == nil {
-				summaryPath, rerr := research.ExecuteCompiledContract(compiled)
-				if rerr == nil {
-					result.ReadonlySummaryPath = summaryPath
-					if repro, ok := research.ReadSiblingArtifact(summaryPath, "reproduction-results.json"); ok {
-						result.ReproductionResults = repro
-						progress("Reproduce bug", "completed", true, fmt.Sprintf("repro_status=%v", repro["repro_status"]))
-					} else {
-						progress("Reproduce bug", "completed", true, summaryPath)
-					}
-				} else {
-					progress("Reproduce bug", "failed", true, rerr.Error())
-				}
+		if err != nil {
+			fail("readonly_compile_failed", err)
+		}
+		compiled, err := research.CompileRunContract(rc)
+		if err != nil {
+			fail("readonly_compile_failed", err)
+		}
+		summaryPath, err := research.ExecuteCompiledContract(compiled)
+		if err != nil {
+			progress("Reproduce bug", "failed", true, err.Error())
+			fail("readonly_execution_failed", err)
+		}
+		result.ReadonlySummaryPath = summaryPath
+		if repro, ok := research.ReadSiblingArtifact(summaryPath, "reproduction-results.json"); ok {
+			result.ReproductionResults = repro
+			if reproStatus, ok := repro["repro_status"].(string); ok {
+				summary.ReproStatus = reproStatus
+			}
+			progress("Reproduce bug", "completed", true, fmt.Sprintf("repro_status=%v", repro["repro_status"]))
+		} else {
+			progress("Reproduce bug", "completed", true, summaryPath)
+		}
+		if proofState, ok := research.ReadSiblingArtifact(summaryPath, "proof-state.json"); ok {
+			if v, ok := proofState["repro_status"].(string); ok {
+				proof.ReproStatus = v
+				summary.ReproStatus = v
+			}
+			if v, ok := proofState["validation_scope"].(string); ok {
+				proof.ValidationScope = v
+			}
+			if v, ok := proofState["fix_confidence"].(string); ok {
+				proof.FixConfidence = v
 			}
 		}
 	} else {
 		progress("Reproduce bug", "skipped", true, "no failing command inferred from issue")
+		summary.ReproStatus = research.ReproStatusNotReproduced
+		proof.ReproStatus = research.ReproStatusNotReproduced
 	}
-	progress("Generate candidates", "synthesizing", false, "")
-	synth, err := research.SynthesizeAutofixPlan(input, backend, research.HostExecutionExceptionDeclared())
+	maxFixRounds := 3
+	var latestSynth research.SynthesisReport
+	loop, loopErr := research.RunAutofixLoop(research.AutofixLoopPolicy{MaxRounds: maxFixRounds}, func(round int, previous *research.AutofixSummary) (*research.AutofixPlan, error) {
+		roundInput := research.BuildNextRoundPlanInput(input, previous)
+		progress("Generate candidates", fmt.Sprintf("round %d synthesizing", round), false, "")
+		synth, err := research.SynthesizeAutofixPlan(roundInput, backend, research.HostExecutionExceptionDeclared())
+		if err != nil {
+			return nil, err
+		}
+		latestSynth = synth
+		result.Synthesis = synth
+		progress("Generate candidates", fmt.Sprintf("round %d found %d attempts", round, len(synth.Attempts)), true, synth.Summary)
+		if synth.AutofixPlan == nil {
+			return &research.AutofixPlan{Objective: synth.Input.FailureText, Repo: input.RepoPath, ArtifactsDir: filepath.Join(os.TempDir(), "airlock-empty-fix-loop"), Attempts: nil}, nil
+		}
+		plan := *synth.AutofixPlan
+		plan.ArtifactsDir = filepath.Join(plan.ArtifactsDir, "fix-loop")
+		return &plan, nil
+	}, func(round int, plan research.AutofixPlan) (string, error) {
+		progress("Attempt execution", fmt.Sprintf("round %d running %d attempts", round, len(plan.Attempts)), false, "")
+		policy, handled := decideExecutionPolicy(plan.Repo)
+		if handled && policy.Preflight.Route == "vm" {
+			compiled, err := research.CompileAutofixPlanToVMContract(plan, policy.BackendKind)
+			if err != nil {
+				return "", err
+			}
+			summaryPath, err := executeBaseContract(compiled)
+			if err != nil {
+				return "", err
+			}
+			if round == maxFixRounds || result.AutofixContractSummary == "" {
+				if autofixResult, ok := research.ReadSiblingArtifact(summaryPath, "autofix-result.json"); ok {
+					result.AutofixResult = autofixResult
+				}
+				if proofState, ok := research.ReadSiblingArtifact(summaryPath, "proof-state.json"); ok {
+					if v, ok := proofState["repro_status"].(string); ok {
+						proof.ReproStatus = v
+						summary.ReproStatus = v
+					}
+					if v, ok := proofState["validation_scope"].(string); ok {
+						proof.ValidationScope = v
+					}
+					if v, ok := proofState["fix_confidence"].(string); ok {
+						proof.FixConfidence = v
+					}
+				}
+			}
+			return summaryPath, nil
+		}
+		summaryPath, err := research.RunAutofixPlan(plan)
+		if err == nil {
+			proof.ValidationScope = "target_only"
+			proof.FixConfidence = "medium"
+		}
+		return summaryPath, err
+	})
+	result.FixLoop = loop
+	result.Synthesis = latestSynth
+	summary.AttemptCount = len(latestSynth.Attempts)
+	if len(loop.Rounds) > 0 {
+		summary.RoundCount = len(loop.Rounds)
+	}
+	if loop.FinalSummaryPath != "" {
+		result.AutofixContractSummary = loop.FinalSummaryPath
+	}
+	if loopErr == nil && result.AutofixContractSummary != "" {
+		progress("Attempt execution", "completed", true, result.AutofixContractSummary)
+		proof.ValidationScope = "target_only"
+		proof.FixConfidence = "medium"
+	} else if loopErr != nil {
+		if len(loop.Rounds) > 0 {
+			last := loop.Rounds[len(loop.Rounds)-1]
+			if last.StopReason == "no_new_attempts" {
+				summary.FailureCategory = "no_new_attempts"
+			} else {
+				summary.FailureCategory = "no_candidate_fix"
+			}
+		} else {
+			summary.FailureCategory = "no_candidate_fix"
+		}
+		if result.AutofixContractSummary == "" {
+			summary.ValidationScope = proof.ValidationScope
+			summary.FixConfidence = proof.FixConfidence
+			appendSummary()
+			fmt.Println(toJSON(result))
+			return
+		}
+	}
+	if result.AutofixContractSummary != "" && proof.ValidationScope == "reproduction_only" {
+		proof.ValidationScope = "target_only"
+		if proof.ReproStatus == research.ReproStatusReproduced {
+			proof.FixConfidence = "medium"
+		} else {
+			proof.FixConfidence = "low"
+		}
+	}
+	decision := research.DecideAdvancement(proof, result.AutofixContractSummary != "", true, false)
+	summary.Advance = decision.ShouldAdvance
+	summary.CredibleAdvancement = decision.CredibleAdvancement
+	summary.VerifiedIssueResolution = decision.VerifiedIssueResolution
+	summary.ValidationScope = proof.ValidationScope
+	summary.FixConfidence = proof.FixConfidence
+	if summary.ReproStatus == "" {
+		summary.ReproStatus = proof.ReproStatus
+	}
+	if decision.FailureCategory != "" {
+		summary.FailureCategory = decision.FailureCategory
+	}
+	if result.AutofixContractSummary != "" {
+		if data, err := os.ReadFile(result.AutofixContractSummary); err == nil {
+			var direct map[string]any
+			if json.Unmarshal(data, &direct) == nil {
+				if v, ok := direct["winningAttempt"].(string); ok {
+					summary.WinningAttempt = v
+				}
+			}
+		}
+		if summary.WinningAttempt == "" {
+			if autofixSummary, ok := research.ReadSiblingArtifact(result.AutofixContractSummary, "autofix-summary.json"); ok {
+				if v, ok := autofixSummary["winningAttempt"].(string); ok {
+					summary.WinningAttempt = v
+				}
+			}
+		}
+	}
+	appendSummary()
+	progress("Done", "finished", true, time.Since(start).Round(time.Second).String())
+	fmt.Println(toJSON(result))
+}
+
+func runMetrics(path string) {
+	if path == "" {
+		path = research.DefaultRunLedgerPath()
+	}
+	items, err := research.LoadRunSummaries(path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	result.Synthesis = synth
-	progress("Generate candidates", fmt.Sprintf("%d attempts", len(synth.Attempts)), true, synth.Summary)
-	if synth.AutofixPlan == nil {
-		fmt.Println(toJSON(result))
-		return
-	}
-	progress("Attempt execution", fmt.Sprintf("running %d attempts", len(synth.AutofixPlan.Attempts)), false, "vm contract")
-	policy, handled := decideExecutionPolicy(synth.AutofixPlan.Repo)
-	if handled && policy.Preflight.Route == "vm" {
-		compiled, err := research.CompileAutofixPlanToVMContract(*synth.AutofixPlan, policy.BackendKind)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		summaryPath, err := executeBaseContract(compiled)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		result.AutofixContractSummary = summaryPath
-		if autofixResult, ok := research.ReadSiblingArtifact(summaryPath, "autofix-result.json"); ok {
-			result.AutofixResult = autofixResult
-		}
-		progress("Attempt execution", "completed", true, summaryPath)
-	} else {
-		summaryPath, err := research.RunAutofixPlan(*synth.AutofixPlan)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		result.AutofixContractSummary = summaryPath
-		progress("Attempt execution", "completed", true, summaryPath)
-	}
-	progress("Done", "finished", true, time.Since(start).Round(time.Second).String())
-	fmt.Println(toJSON(result))
+	summary := research.SummarizeRunMetrics(items)
+	summary.LedgerPath = path
+	fmt.Println(toJSON(summary))
 }
 
 func runPreflight(path string) {

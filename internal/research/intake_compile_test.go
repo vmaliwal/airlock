@@ -8,6 +8,39 @@ import (
 	"github.com/vmaliwal/airlock/internal/util"
 )
 
+func TestCompilePlanInputToRunContractGoPrefixesToolchainBootstrap(t *testing.T) {
+	repo := t.TempDir()
+	if err := InitTempGitRepo(repo, map[string]string{
+		"go.mod":          "module example.com/beats\n\ngo 1.25.8\n",
+		"version.go":      "package beats\n",
+		"version_test.go": "package beats\n",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := util.RunLocal("git", []string{"remote", "add", "origin", "git@github.com:example/beats.git"}, util.RunOptions{Cwd: repo}); err != nil {
+		t.Fatal(err)
+	}
+	input := PlanInput{
+		RepoPath:       repo,
+		IssueURL:       "https://github.com/elastic/beats/issues/49491",
+		FailingCommand: "go test ./libbeat/common/kafka -run TestRepro_MajorVersionAliasUsesLatestMinor -count=1",
+		FailureText:    "Kafka major alias resolves to wrong version",
+	}
+	rc, err := CompilePlanInputToRunContract(input, "lima", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rc.Reproduction.Command, "go.dev/dl/go1.25.8.linux-") {
+		t.Fatalf("expected go toolchain bootstrap in reproduction command, got %#v", rc.Reproduction.Command)
+	}
+	if !strings.Contains(rc.Reproduction.Command, "export PATH=/tmp/airlock-go/go/bin:$PATH") {
+		t.Fatalf("expected PATH bootstrap in reproduction command, got %#v", rc.Reproduction.Command)
+	}
+	if len(rc.Airlock.Security.BootstrapAptPackages) == 0 || !contains(rc.Airlock.Security.BootstrapAptPackages, "curl") {
+		t.Fatalf("expected curl bootstrap package for go repo, got %#v", rc.Airlock.Security.BootstrapAptPackages)
+	}
+}
+
 func TestCompilePlanInputToRunContractPythonSubdir(t *testing.T) {
 	repo := t.TempDir()
 	if err := InitTempGitRepo(repo, map[string]string{

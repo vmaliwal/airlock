@@ -31,12 +31,16 @@ func PreflightRepo(path string, vmBackend string, allowHostExecution bool) (Pref
 		decision.Route = "stop"
 		decision.Reason = "repo root is a monorepo entrypoint; choose a concrete package/module target before running attempts"
 		decision.SuggestedNextActions = append(decision.SuggestedNextActions, assessment.Evidence...)
-	case "host_toolchain_blocked_vm_runnable":
+	case "host_toolchain_blocked_vm_runnable", "bootstrap_needed_vm_preferred", "partial_runnable_scope":
 		decision.Route = "vm"
-		decision.Reason = "host toolchain is insufficient; route validation/mutation into a disposable VM"
+		decision.Reason = "repo should be executed in a disposable VM before mutation/validation proceeds"
 		decision.SuggestedVMBackend = vmBackend
-		decision.SuggestedCommands = []string{"airlock autofix-run <autofix.json>", "airlock attempt-run <attempt.json>", "airlock research-run <research.json>"}
+		decision.SuggestedCommands = []string{"airlock investigate <repo-path>", "airlock plan <repo-path>", "airlock autofix-run <autofix.json>", "airlock attempt-run <attempt.json>", "airlock research-run <research.json>"}
 		decision.SuggestedNextActions = []string{"use VM-backed run", "avoid host validation", "capture resulting artifacts and lessons"}
+	case "env_config_blocked":
+		decision.Route = "stop"
+		decision.Reason = "repo execution context is still underspecified; gather missing environment/bootstrap context before mutation"
+		decision.SuggestedNextActions = append(decision.SuggestedNextActions, assessment.Evidence...)
 	default:
 		if !allowHostExecution {
 			if vmBackend != "" {

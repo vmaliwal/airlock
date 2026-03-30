@@ -96,12 +96,13 @@ func plannerRequestFor(input PlanInput, report PlanReport, validationCmd string)
 	if report.Investigation.Profile.RepoType == "go" {
 		allowed = append(allowed, "nil_guard", "error_return")
 	}
+	avoid := avoidMutationKinds(input)
 	return PlannerRequest{
 		Input:               input,
 		Investigation:       report.Investigation,
 		ValidationCommand:   validationCmd,
-		RankedMutationKinds: report.RankedMutationKinds,
-		AllowedMutations:    dedupeStrings(allowed),
+		RankedMutationKinds: filterRankedMutationKinds(report.RankedMutationKinds, avoid),
+		AllowedMutations:    filterAllowedMutations(allowed, avoid),
 		CandidateFiles:      collectPlannerFileContext(report.Investigation.Profile.TargetPath, input),
 	}
 }

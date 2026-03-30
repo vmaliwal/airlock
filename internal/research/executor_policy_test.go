@@ -3,6 +3,7 @@ package research
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	base "github.com/vmaliwal/airlock/internal/contract"
@@ -62,6 +63,41 @@ func TestExecuteRunContractReadOnlyWritesProofState(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(artifacts, "proof-state.json")); err != nil {
 		t.Fatalf("expected proof-state artifact, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(artifacts, "advancement-decision.json")); err != nil {
+		t.Fatalf("expected advancement decision artifact, got %v", err)
+	}
+}
+
+func TestExecuteRunContractReadOnlyRejectsBootstrapFailureAsReproduction(t *testing.T) {
+	repo, err := os.MkdirTemp("", "airlock-exec-bootstrap-repo-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(repo)
+	if err := InitTempGitRepo(repo, map[string]string{"a.txt": "ok\n"}); err != nil {
+		t.Fatal(err)
+	}
+	artifacts, err := os.MkdirTemp("", "airlock-exec-bootstrap-artifacts-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(artifacts)
+	var rc RunContract
+	rc.Objective = "test"
+	rc.Mode = "read_only"
+	rc.Airlock.Backend.Kind = base.BackendLima
+	rc.Reproduction = Phase{Command: "foobarbazcmd --version", Repeat: 1, Success: SuccessRule{MinFailures: pintVal(1)}}
+	rc.Validation = ValidationSpec{TargetCommand: "true", Repeat: 1, Success: SuccessRule{ExitCode: pintVal(0)}}
+	if err := ExecuteRunContract(rc, repo, artifacts); err == nil {
+		t.Fatal("expected bootstrap failure to prevent reproduced status")
+	}
+	proofBytes, err := os.ReadFile(filepath.Join(artifacts, "proof-state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(proofBytes), ReproStatusBootstrapFailure) {
+		t.Fatalf("expected bootstrap failure proof, got %s", string(proofBytes))
 	}
 }
 

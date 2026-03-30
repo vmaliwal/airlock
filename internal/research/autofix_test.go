@@ -56,4 +56,7 @@ func TestRunAutofixPlanStopsOnWinningAttempt(t *testing.T) {
 	if !summary.Success || summary.WinningAttempt != "good-fix" {
 		t.Fatalf("unexpected summary: %#v", summary)
 	}
+	if summary.PromotedCheckpoint == "" {
+		t.Fatalf("expected promoted checkpoint in summary: %#v", summary)
+	}
 }

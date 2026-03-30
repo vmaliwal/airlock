@@ -59,7 +59,7 @@ func (b Backend) Run(c contract.Contract) (backend.RunResult, error) {
 	}
 	if needsResearchGuestBinary(c) {
 		guestBin := filepath.Join(workDir, "airlock-researchguest")
-		if _, err := util.RunLocal("go", []string{"build", "-o", guestBin, "./cmd/researchguest"}, util.RunOptions{Cwd: repoRoot(), Env: append(os.Environ(), "GOOS=linux", "GOARCH=arm64", "CGO_ENABLED=0", "GOTOOLCHAIN=local")}); err != nil {
+		if _, err := util.RunLocal("go", []string{"build", "-o", guestBin, "./cmd/researchguest"}, util.RunOptions{Cwd: repoRoot(), Env: guestBuildEnv("arm64")}); err != nil {
 			return backend.RunResult{}, fmt.Errorf("build research guest binary: %w", err)
 		}
 		if _, err := util.RunLocal("limactl", []string{"copy", guestBin, sandboxName + ":/tmp/airlock-researchguest"}, util.RunOptions{}); err != nil {
@@ -68,7 +68,7 @@ func (b Backend) Run(c contract.Contract) (backend.RunResult, error) {
 	}
 	if needsAirlockBinary(c) {
 		guestBin := filepath.Join(workDir, "airlock")
-		if _, err := util.RunLocal("go", []string{"build", "-o", guestBin, "./cmd/airlock"}, util.RunOptions{Cwd: repoRoot(), Env: append(os.Environ(), "GOOS=linux", "GOARCH=arm64", "CGO_ENABLED=0", "GOTOOLCHAIN=local")}); err != nil {
+		if _, err := util.RunLocal("go", []string{"build", "-o", guestBin, "./cmd/airlock"}, util.RunOptions{Cwd: repoRoot(), Env: guestBuildEnv("arm64")}); err != nil {
 			return backend.RunResult{}, fmt.Errorf("build airlock guest binary: %w", err)
 		}
 		if _, err := util.RunLocal("limactl", []string{"copy", guestBin, sandboxName + ":/tmp/airlock"}, util.RunOptions{}); err != nil {
@@ -93,7 +93,7 @@ func (b Backend) Run(c contract.Contract) (backend.RunResult, error) {
 	_, _ = util.RunLocal("limactl", []string{"copy", sandboxName + ":/tmp/airlock-artifacts.tgz", hostTarball}, util.RunOptions{})
 
 	// copy common artifacts if present
-	for _, name := range []string{"repo.patch", "steps.json", "outcome.md", "reproduction-results.json", "validation-results.json", "baseline-results.json", "campaign-baseline.json", "attempt-log.jsonl", "autofix-result.json", "autofix-summary.json", "proof-state.json"} {
+	for _, name := range []string{"repo.patch", "steps.json", "outcome.md", "reproduction-results.json", "validation-results.json", "baseline-results.json", "campaign-baseline.json", "attempt-log.jsonl", "autofix-result.json", "autofix-summary.json", "proof-state.json", "advancement-decision.json"} {
 		hostPath := filepath.Join(c.Sandbox.ArtifactsDir, sandboxName+"-"+name)
 		_, _ = util.RunLocal("limactl", []string{"copy", sandboxName + ":/airlock/artifacts/" + name, hostPath}, util.RunOptions{})
 	}
@@ -124,6 +124,14 @@ func needsAirlockBinary(c contract.Contract) bool {
 		}
 	}
 	return false
+}
+
+func guestBuildEnv(goarch string) []string {
+	toolchain := os.Getenv("GOTOOLCHAIN")
+	if toolchain == "" {
+		toolchain = "auto"
+	}
+	return append(os.Environ(), "GOOS=linux", "GOARCH="+goarch, "CGO_ENABLED=0", "GOTOOLCHAIN="+toolchain)
 }
 
 func repoRoot() string {

@@ -1,6 +1,6 @@
 # Next-Phase Gaps
 
-Last updated: 2026-03-29
+Last updated: 2026-03-30
 Baseline version: `v0.1.0` (`c93e806`)
 
 This document is the durable gap tracker for Airlock.
@@ -91,6 +91,9 @@ Recently closed Tier 1 product gaps:
 - setup-step no-op checkpoint handling
 - `AIR-006` proof/confidence artifacts
 - `AIR-003` Python bootstrap policy
+- truthful readonly reproduction states now block false `reproduced` claims on infra/bootstrap/env failures
+- canonical run ledger now records credible advancement and verified issue resolution
+- issue-provided repro scaffolding now compiles into readonly `fix` runs for bounded temporary repro files
 
 ## Next implementation program: planner-backed autonomous repair
 This is now the primary next workstream.
@@ -147,9 +150,130 @@ Required slices:
    - optional convenience path: `install.sh` / release-binary installer
    - explicitly skip Homebrew for now
    - status: first `install.sh` convenience path shipped
-7. **Honest messaging**
+7. **Metric-gated repo understanding upgrade**
+   - do not let `rlm` or other recursive repo-reading systems take over the current Airlock roadmap
+   - treat richer repo-reading as a next-version candidate only if metrics show repo understanding is the bottleneck
+   - start tracking:
+     - top-1 / top-3 / top-5 candidate file hit rate against known issue fixes
+     - repro inference success rate
+     - share of failed runs attributable to repo-understanding/localization failure
+     - irrelevant-attempt waste rate due to poor localization
+   - only consider integrating an `rlm`-style reader if these metrics show current deterministic intake/context packaging is the limiting factor
+8. **Honest messaging**
    - describe current state as autonomous candidate-fix generation for supported classes
    - do not claim broad autonomous bug fixing until planner coverage and evals justify it
+   - current support posture should stay explicit:
+     - Tier 1 fix ecosystems:
+       - Go
+       - Python
+       - TypeScript / JavaScript
+     - ecosystems like C# remain outside the main fix promise until detection, bootstrap, repro inference, and validation paths are proven
+9. **Immediate Tier 1 validation matrix**
+   - before expanding ecosystem claims further, keep pressure-testing the current Tier 1 set with fresh repos/issues:
+     - 1 Go repo/issue
+     - 1 Python repo/issue
+     - 1 TypeScript/JavaScript repo/issue
+   - use these runs to verify:
+     - truthful reproduction state
+     - run-ledger / metrics emission
+     - bounded multi-round loop behavior
+     - duplicate-strategy suppression
+     - winner-promotion artifacts when a fix succeeds
+   - log any newly exposed failures in `docs/product-issues.md` before implementation
+
+## Operating-law implementation plan
+This section captures the Karpathy-style operating law Airlock should preserve and the concrete next implementation steps implied by that law.
+
+Core law:
+- no branch/worktree advancement without stronger evidence
+- candidate generation should be cheap
+- validation must be real
+- winner states should advance
+- loser states should revert
+- the loop should continue until bounded stop conditions, not after one polite failure
+
+Priority implementation steps:
+1. **Make advancement explicit**
+   - add a first-class advancement/keep-discard decision object
+   - centralize the rules for:
+     - reproduced vs not reproduced
+     - infra/bootstrap failure vs real bug reproduction
+     - targeted-only validation vs broader validation
+     - regression detection
+     - confidence-gated advancement
+2. **Fix reproduction truthfulness**
+   - toolchain/bootstrap/env failures must not count as reproduced bugs
+   - readonly proof state should distinguish:
+     - `reproduced`
+     - `not_reproduced`
+     - `infra_failure`
+     - `bootstrap_failure`
+     - `env_blocked`
+   - advancement logic must consume this richer reproduction state
+3. **Turn autofix into a continuous loop**
+   - status: first bounded loop implementation shipped
+   - current behavior:
+     - bounded multi-round attempt execution exists
+     - duplicate attempts are suppressed across rounds
+     - prior-round failure memory is carried into later synthesis rounds
+     - previously failed mutation kinds are avoided when alternate strategy families exist
+   - remaining gap:
+     - deeper strategy switching beyond mutation-kind avoidance
+     - stronger no-improvement / same-fingerprint stop semantics at the top-level loop
+     - more issue classes that can benefit from later-round resynthesis
+4. **Strengthen durable memory**
+   - add a compact run ledger in addition to rich artifacts
+   - keep cross-run memory of:
+     - attempt outcome
+     - top fingerprint
+     - proof state
+     - keep/discard result
+     - winning patch/summary paths
+   - minimum canonical run summary fields:
+     - `run_id`
+     - `timestamp`
+     - `customer_id`
+     - `repo_key`
+     - `issue_key`
+     - `entrypoint`
+     - `airlock_version`
+     - `backend`
+     - `repo_sha`
+     - `repro_status`
+     - `advance`
+     - `credible_advancement`
+     - `verified_issue_resolution`
+     - `fix_confidence`
+     - `validation_scope`
+     - `attempt_count`
+     - `round_count`
+     - `duration_seconds`
+     - `failure_category`
+     - `winning_attempt`
+   - aggregate this run ledger at three levels:
+     - per repo
+     - per customer
+     - global Airlock
+5. **Promote winners explicitly**
+   - status: explicit winner promotion is now recorded
+   - successful attempts now emit:
+     - `winnerPromoted`
+     - `promotedCheckpoint`
+   - remaining gap:
+     - use promoted checkpoints more aggressively in longer chained repair campaigns after an initial success
+6. **Deepen lessons into strategy priors**
+   - use durable memory to bias:
+     - mutation families
+     - likely files
+     - failure-class-specific repair families
+     - duplicate-strategy avoidance
+7. **Keep `airlock fix` as the canonical loop surface**
+   - `fix` should become the main continuous loop wrapper over intake, reproduction, synthesis, attempts, proof, and reviewer output
+
+Why this matters:
+- the loop is the product
+- the planner, contracts, and substrate are support systems for the loop, not the product itself
+- Airlock should optimize for more honest measured attempts per hour, not just more orchestration surface
 
 ## 1. Repair planning is still weak
 Current:
@@ -298,12 +422,13 @@ Desired next state:
 Current:
 - many real validations have been run manually
 - several real OSS wins exist
+- first planner eval harness now exists
 
 Gap:
-- no dedicated eval suite yet
-- no persistent benchmark corpus
-- no cross-version score tracking
-- no quality dashboard for repair performance
+- benchmark corpus is still small
+- no cross-version score tracking dashboard
+- repo-understanding metrics are not yet tracked explicitly
+- no unified operating-law scorecard across reproduction, advancement, and attempt efficiency
 
 Why it matters:
 - without evals, improvement remains anecdotal
@@ -509,6 +634,26 @@ Deliverables:
 - `evals/` benchmark corpus
 - machine-readable eval summaries
 - cross-version score tracking
+- canonical append-only run ledger (`runs.jsonl` now exists; `attempts.jsonl` and `rounds.jsonl` can follow if needed)
+- repo-understanding scorecard:
+  - top-1 / top-3 / top-5 candidate file hit rate
+  - repro inference success rate
+  - unsupported-due-to-understanding share
+  - irrelevant-attempt waste rate
+- operating-law scorecard:
+  - truthful reproduction rate
+  - credible advancement rate
+  - keep/discard correctness
+  - attempts-to-first-credible-fix
+  - winner-advancement rate
+- customer/product scorecard:
+  - verified issue resolution rate
+  - per-customer median time-to-credible-fix
+  - autonomous completion rate
+- aggregation views:
+  - per repo
+  - per customer
+  - global Airlock
 
 Success signals:
 - progress is measurable instead of anecdotal

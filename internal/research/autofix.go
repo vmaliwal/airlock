@@ -19,13 +19,15 @@ type AutofixPlan struct {
 }
 
 type AutofixSummary struct {
-	Objective      string           `json:"objective"`
-	Repo           string           `json:"repo"`
-	StartedAt      string           `json:"startedAt"`
-	FinishedAt     string           `json:"finishedAt"`
-	Success        bool             `json:"success"`
-	WinningAttempt string           `json:"winningAttempt,omitempty"`
-	Attempts       []AttemptOutcome `json:"attempts"`
+	Objective          string           `json:"objective"`
+	Repo               string           `json:"repo"`
+	StartedAt          string           `json:"startedAt"`
+	FinishedAt         string           `json:"finishedAt"`
+	Success            bool             `json:"success"`
+	WinningAttempt     string           `json:"winningAttempt,omitempty"`
+	WinnerPromoted     bool             `json:"winnerPromoted,omitempty"`
+	PromotedCheckpoint string           `json:"promotedCheckpoint,omitempty"`
+	Attempts           []AttemptOutcome `json:"attempts"`
 }
 
 func LoadAutofixPlan(path string) (AutofixPlan, error) {
@@ -179,6 +181,12 @@ func RunAutofixPlan(plan AutofixPlan) (string, error) {
 		if outcome.Success {
 			summary.Success = true
 			summary.WinningAttempt = outcome.Name
+			promotedSHA, promoted, err := PromoteWinningAttempt(plan.Repo, outcome.Name)
+			if err != nil {
+				return "", err
+			}
+			summary.WinnerPromoted = promoted
+			summary.PromotedCheckpoint = promotedSHA
 			break
 		}
 	}

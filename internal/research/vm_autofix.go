@@ -4,9 +4,7 @@ import (
 	base64 "encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	base "github.com/vmaliwal/airlock/internal/contract"
@@ -110,20 +108,9 @@ func toolchainBootstrapSnippet(repo string) string {
 	if err != nil {
 		return ""
 	}
-	if profile.RepoType != "go" {
+	cmd := goToolchainBootstrapCommand(profile)
+	if cmd == "" {
 		return ""
 	}
-	goModBytes, err := os.ReadFile(filepath.Join(profile.RepoRoot, "go.mod"))
-	if err != nil {
-		return ""
-	}
-	req := detectGoDirective(string(goModBytes))
-	if req == "" {
-		return ""
-	}
-	arch := "amd64"
-	if runtime.GOARCH == "arm64" {
-		arch = "arm64"
-	}
-	return fmt.Sprintf("mkdir -p /tmp/airlock-go && if ! command -v go >/dev/null 2>&1 || ! go version | grep -q 'go%s'; then curl -fsSL https://go.dev/dl/go%s.linux-%s.tar.gz -o /tmp/go.tgz && rm -rf /tmp/airlock-go/go && tar -C /tmp/airlock-go -xzf /tmp/go.tgz; fi && export PATH=/tmp/airlock-go/go/bin:$PATH && export GOTOOLCHAIN=local\n", req, req, arch)
+	return cmd + "\n"
 }
