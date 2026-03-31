@@ -97,7 +97,7 @@ Recently closed Tier 1 product gaps:
 
 Fresh progress on the current commercial path:
 - `airlock fix` now emits `review-packet.md` and `draft-pr.md` artifacts for GitHub-first reviewer output
-- `airlock fix` now has an explicit optional draft-PR publication path behind `AIRLOCK_GITHUB_CREATE_DRAFT_PR=1`
+- `airlock fix` now has an explicit optional draft-PR publication path behind `AIRLOCK_GITHUB_CREATE_DRAFT_PR=1`, including issue-comment backlinking when publication succeeds
 - guest GitHub clone auth now has a first bounded `GITHUB_TOKEN` allowlist path for intake-compiled GitHub flows
 
 ## Next implementation program: planner-backed autonomous repair

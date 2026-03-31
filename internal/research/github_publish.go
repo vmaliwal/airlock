@@ -19,10 +19,11 @@ const (
 )
 
 type DraftPRPublication struct {
-	URL        string `json:"url,omitempty"`
-	Number     int    `json:"number,omitempty"`
-	Branch     string `json:"branch,omitempty"`
-	BaseBranch string `json:"base_branch,omitempty"`
+	URL             string `json:"url,omitempty"`
+	Number          int    `json:"number,omitempty"`
+	Branch          string `json:"branch,omitempty"`
+	BaseBranch      string `json:"base_branch,omitempty"`
+	IssueCommentURL string `json:"issue_comment_url,omitempty"`
 }
 
 func GitHubDraftPRPublishingEnabled() bool {
@@ -52,7 +53,14 @@ func CreateDraftPRFromFix(result FixResult, baseBranch string) (DraftPRPublicati
 		return DraftPRPublication{}, err
 	}
 	title, body := splitDraftPRBody(string(bodyBytes), result)
-	return createGitHubDraftPR(result.Issue, branch, baseBranch, title, body)
+	pub, err := createGitHubDraftPR(result.Issue, branch, baseBranch, title, body)
+	if err != nil {
+		return DraftPRPublication{}, err
+	}
+	if commentURL, err := createGitHubIssueComment(result.Issue, renderIssueComment(result, pub)); err == nil {
+		pub.IssueCommentURL = commentURL
+	}
+	return pub, nil
 }
 
 func createGitHubDraftPR(issue GitHubIssue, head, base, title, body string) (DraftPRPublication, error) {
@@ -95,6 +103,53 @@ func createGitHubDraftPR(issue GitHubIssue, head, base, title, body string) (Dra
 		return DraftPRPublication{}, err
 	}
 	return DraftPRPublication{URL: out.HTMLURL, Number: out.Number, Branch: head, BaseBranch: base}, nil
+}
+
+func createGitHubIssueComment(issue GitHubIssue, body string) (string, error) {
+	payload := map[string]any{"body": body}
+	data, _ := json.Marshal(payload)
+	apiBase := strings.TrimSpace(os.Getenv(GitHubAPIBaseURLEnv))
+	if apiBase == "" {
+		apiBase = "https://api.github.com"
+	}
+	url := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments", strings.TrimRight(apiBase, "/"), issue.Owner, issue.Repo, issue.Number)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "airlock")
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(os.Getenv("GITHUB_TOKEN")))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		buf := new(bytes.Buffer)
+		_, _ = buf.ReadFrom(resp.Body)
+		return "", fmt.Errorf("github issue comment create failed: %s: %s", resp.Status, strings.TrimSpace(buf.String()))
+	}
+	var out struct {
+		HTMLURL string `json:"html_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	return out.HTMLURL, nil
+}
+
+func renderIssueComment(result FixResult, pub DraftPRPublication) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Airlock opened a draft PR: %s\n\n", pub.URL)
+	if result.ReviewPacketPath != "" {
+		fmt.Fprintf(&b, "- Review packet: `%s`\n", result.ReviewPacketPath)
+	}
+	if result.DraftPRPath != "" {
+		fmt.Fprintf(&b, "- Draft PR artifact: `%s`\n", result.DraftPRPath)
+	}
+	return b.String()
 }
 
 func splitDraftPRBody(raw string, result FixResult) (string, string) {

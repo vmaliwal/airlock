@@ -55,6 +55,37 @@ func TestCreateGitHubDraftPR(t *testing.T) {
 	}
 }
 
+func TestCreateGitHubIssueComment(t *testing.T) {
+	oldToken := os.Getenv("GITHUB_TOKEN")
+	oldBase := os.Getenv(GitHubAPIBaseURLEnv)
+	defer os.Setenv("GITHUB_TOKEN", oldToken)
+	defer os.Setenv(GitHubAPIBaseURLEnv, oldBase)
+	os.Setenv("GITHUB_TOKEN", "ghp_test")
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"html_url": "https://github.com/owner/repo/issues/1#issuecomment-1"})
+	}))
+	defer srv.Close()
+	os.Setenv(GitHubAPIBaseURLEnv, srv.URL)
+	url, err := createGitHubIssueComment(GitHubIssue{Owner: "owner", Repo: "repo", Number: 1}, "hello")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if url == "" || got["body"] != "hello" {
+		t.Fatalf("unexpected comment result: url=%q payload=%#v", url, got)
+	}
+}
+
+func TestRenderIssueComment(t *testing.T) {
+	text := renderIssueComment(FixResult{ReviewPacketPath: "/tmp/review-packet.md", DraftPRPath: "/tmp/draft-pr.md"}, DraftPRPublication{URL: "https://github.com/owner/repo/pull/10"})
+	if !strings.Contains(text, "Airlock opened a draft PR") || !strings.Contains(text, "/tmp/review-packet.md") {
+		t.Fatalf("unexpected issue comment: %s", text)
+	}
+}
+
 func TestGitPushBranchToGitHubRejectsNonGitHubRemote(t *testing.T) {
 	repo := t.TempDir()
 	if err := InitTempGitRepo(repo, map[string]string{"a.txt": "hello\n"}); err != nil {

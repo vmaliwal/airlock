@@ -574,7 +574,7 @@ This issue remains open because automated GitHub draft PR creation/posting is st
 Additional progress now shipped:
 - `airlock fix` can optionally attempt GitHub draft PR publication when explicitly enabled with `AIRLOCK_GITHUB_CREATE_DRAFT_PR=1`
 - publication is gated on current run evidence and requires `GITHUB_TOKEN`
-- the first implementation creates a branch from the promoted fix state, pushes it, and creates a draft PR via the GitHub API
+- the first implementation creates a branch from the promoted fix state, pushes it, creates a draft PR via the GitHub API, and posts the PR link back to the issue when possible
 
 Remaining gap:
 - this path still needs live end-to-end validation on a safe target plus follow-up PR/comment polish
