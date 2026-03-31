@@ -615,3 +615,33 @@ Progress now shipped:
 - guest clone scripts now use bounded GitHub HTTPS auth when `GITHUB_TOKEN` is present and the clone target is `https://github.com/...`
 
 This issue remains open because the end-to-end private-repo story still needs broader coverage beyond clone auth, including authenticated fetch/push paths and clearer credential lifecycle policy.
+
+## AIR-015 — Autofix VM guest path broken for issue-flow cloned repos
+- Status: `new`
+- Severity: `sev1`
+- Type: `runtime`
+- First seen: `2026-03-30`
+- Reported by: `repo validation`
+- Source repo: `hashicorp/terraform`
+- Source issue: `#38302`
+- Affected command: `airlock fix <github-issue-url>`
+
+### Problem
+`airlock fix` clones a repo into a macOS temp dir (e.g. `/var/folders/.../airlock-fix-hashicorp-...`). When synthesis generates autofix attempts, `CompileAutofixPlanToVMContract` uses that host path as the plan's repo path. Inside the Lima guest, that macOS temp path does not exist, so the guest script's `cd` command fails.
+
+### Evidence
+- `airlock fix https://github.com/hashicorp/terraform/issues/38302` after Slice 2
+- synthesis generated 2 attempts (defer-close heuristic)
+- autofix VM run failed with: `/tmp/guest-run.sh: line 105: cd: ../../../../../../../var/folders/.../airlock-fix-hashicorp-...: No such file or directory`
+
+### User impact
+Synthesis works but autofix execution breaks for any issue where `airlock fix` clones the repo to a host temp dir. Blocks the main `airlock fix` path from completing end-to-end even when synthesis succeeds.
+
+### Expected
+The autofix VM contract should clone the repo fresh inside the guest (same as readonly research runs) rather than referencing the host-side temp clone path.
+
+### Current workaround
+Use a pre-cloned local repo path and run `airlock autofix-run` directly.
+
+### Notes
+The readonly reproduction path already works correctly because `CompilePlanInputToRunContract` uses the issue's clone URL, not the local path. The same pattern needs to apply to the autofix VM compilation path when initiated from `airlock fix`.
