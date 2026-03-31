@@ -16,6 +16,12 @@ type AutofixPlan struct {
 	Checkpoint       string        `json:"checkpoint,omitempty"`
 	FingerprintHints []string      `json:"fingerprint_hints,omitempty"`
 	Attempts         []AttemptFile `json:"attempts"`
+	// CloneURL and RepoType are optional but strongly preferred when the plan
+	// was built by airlock fix from an issue URL. When set, the VM contract
+	// uses these values directly instead of re-reading git metadata from a
+	// potentially symlink-affected or already-deleted host temp path.
+	CloneURL string `json:"cloneUrl,omitempty"`
+	RepoType string `json:"repoType,omitempty"`
 }
 
 type AutofixSummary struct {

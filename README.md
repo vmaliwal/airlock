@@ -1,260 +1,148 @@
 # Airlock
 
-Airlock is a disposable VM sandbox runner for executing untrusted repository workflows outside the host machine.
+Autonomous bug fixing inside disposable VMs.
 
-It also contains the canonical command-first autoresearch engine: probe, classify, reproduce, synthesize bounded candidate fixes for supported bug classes, validate, learn, and run those loops inside disposable VMs when host execution is not trustworthy or not viable.
+Give Airlock a GitHub issue URL. It reproduces the bug, synthesizes bounded candidate fixes for supported bug classes, validates them in an isolated VM, and publishes a draft PR.
 
-Principles:
-- untrusted repos never run on the host
-- execution happens inside disposable VMs
-- host secrets are scrubbed by default
-- HOME/XDG dirs are temporary inside the guest
-- network is denied by default and optionally allowlisted
-- only declared artifacts come back
+```bash
+airlock fix https://github.com/owner/repo/issues/123
+```
 
-Backends:
-- `lima` — macOS local Linux VM backend via Lima / Virtualization.framework
-- `firecracker` — Linux/cloud backend via Firecracker host orchestration
+## What it does
 
-Current parity note:
-- Lima has the proven guest-binary path for `/tmp/airlock` and `/tmp/airlock-researchguest`
-- Firecracker now stages guest helper binaries and passes explicit `--copy-in` mappings to the host shim
-- the expected shim interface is documented in `docs/firecracker-host-shim.md`
-- a reference shim now exists at `scripts/firecracker/airlock-firecracker-host.sh`
-- host bring-up is documented in `docs/firecracker-host-setup.md`
-- full Firecracker parity still depends on validated driver + end-to-end Linux/cloud runs
-
-## Why Go
-
-Airlock is an infra/security tool. Go gives us:
-- single static binary distribution
-- strong subprocess/file/network ergonomics
-- easy macOS/Linux support
-- no Node runtime dependency on the operator machine
-
-Current minimum toolchain: **Go 1.23+**
-- this is now required by the official Anthropic Go SDK used for planner-backed synthesis
-
-## Status
-
-- Lima backend: implemented at the orchestration layer for macOS
-- Firecracker backend: implemented at the orchestration layer for Linux/cloud hosts
-- Guest runner payload generation: implemented
-- End-to-end guest validation depends on host backend availability (`limactl` on macOS, Firecracker host shim on Linux)
+```
+resolve issue
+  → clone repo
+  → classify + route (host vs VM)
+  → classify issue signals (service-dependent? setup vs repro command?)
+  → reproduce bug in VM
+  → synthesize candidate fixes
+  → multi-round fix loop (with duplicate suppression + strategy switching)
+  → promote winning attempt
+  → emit review-packet.md + draft-pr.md
+  → (optional) publish GitHub draft PR + issue comment
+  → append to run ledger
+```
 
 ## Install
-
-Primary install path:
 
 ```bash
 go install github.com/vmaliwal/airlock/cmd/airlock@latest
 ```
 
-Optional convenience install path:
+Optional convenience installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vmaliwal/airlock/main/install.sh | bash
 ```
 
-Notes:
-- the installer prefers GitHub release binaries when available
-- if no release binary is available yet, it falls back to `go install` when a Go toolchain exists
-- Homebrew is intentionally not the current distribution path
+Requires Go 1.23+. Homebrew is not the current distribution path.
 
-## Build
+## Quick start
+
+```bash
+# Fix a public GitHub issue
+airlock fix https://github.com/owner/repo/issues/123
+
+# View run metrics
+airlock metrics
+
+# Check VM backend prerequisites
+airlock check
+```
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `GITHUB_TOKEN` | GitHub auth — required for private repos and PR publishing |
+| `AIRLOCK_GITHUB_CREATE_DRAFT_PR=1` | Enable automatic draft PR creation after a credible fix |
+| `AIRLOCK_PLANNER_PROVIDER=anthropic` | Enable LLM-backed synthesis |
+| `ANTHROPIC_API_KEY` | API key for LLM planner |
+| `AIRLOCK_PLANNER_MODEL` | Override planner model (default: `claude-sonnet-4-5`) |
+| `AIRLOCK_ALLOW_HOST_EXEC_EXCEPTION=1` | Allow host execution of repo code (use sparingly) |
+| `AIRLOCK_METRICS_DIR` | Custom path for `runs.jsonl` ledger |
+| `AIRLOCK_CUSTOMER_ID` | Customer identifier for multi-tenant metric rollups |
+| `AIRLOCK_LESSONS_ROOT` | Path to a broader lesson corpus for planning |
+
+## Backends
+
+- **lima** — macOS local Linux VM via Lima / Virtualization.framework
+- **firecracker** — Linux/cloud VM via Firecracker host shim
+
+Lima is fully operational. Firecracker is implemented and documented; full parity requires a validated host shim driver. See `docs/backends.md`.
+
+## `airlock fix` behaviour
+
+- Resolves the GitHub issue and infers a reproduction command from the issue body
+- Detects service-dependent issues (HMR, dev server, browser repro) early
+- Flags setup-only commands vs real test assertions
+- Runs a read-only VM reproduction to establish honest `repro_status`
+- Synthesizes candidate fix attempts for supported bug classes:
+  - Go: expected/got normalization, resource lifecycle (missing defer/close)
+  - Python: unclosed code block, empty-string guard, isinstance/None type guard, missing return of accumulator
+  - Optional LLM planner for broader coverage
+- Runs a bounded multi-round autofix loop with:
+  - duplicate attempt suppression
+  - prior-round failure memory
+  - mutation-kind strategy switching
+  - winner promotion with checkpoint recording
+- Emits `review-packet.md` and `draft-pr.md` artifacts always
+- Optionally creates a GitHub draft PR and posts the link back to the issue
+
+## Supported Tier-1 languages
+
+Go, Python, TypeScript/JavaScript.
+
+C# and other languages are classified and routed honestly but are outside the current fix promise.
+
+## Inspection commands
+
+Read-only. Safe to run anytime. No side effects.
+
+```bash
+airlock probe <repo>               # classify repo type and runability
+airlock investigate <repo>         # full investigation report
+airlock plan <repo|input.json>     # repair strategy without execution
+airlock preflight <repo>           # routing decision (host vs VM)
+airlock metrics [runs.jsonl]       # view run ledger and scorecards
+```
+
+## Advanced / escape-hatch commands
+
+Use these when debugging Airlock itself or isolating a specific pipeline stage.
+Normal usage should go through `airlock fix`.
+
+```bash
+airlock synthesize <input.json>          # generate candidate attempts only
+airlock eval-planner <cases.json>        # run planner eval corpus
+airlock intake-compile <input>           # compile issue intake to research contract
+
+airlock attempt-run <attempt.json>       # run a single bounded attempt
+airlock autofix-run <plan.json>          # run a prepared multi-attempt autofix plan
+airlock research-run <contract.json>     # run a full research contract in VM
+airlock research-validate <contract>     # validate research contract (no exec)
+airlock campaign-run <plan.json>         # run a multi-issue campaign
+airlock campaign-validate <plan>         # validate campaign plan (no exec)
+airlock run <contract.json>              # run a raw VM contract
+airlock validate <contract.json>         # validate a raw VM contract (no exec)
+airlock template <type>                  # print a contract template
+```
+
+## Build and test
 
 ```bash
 go build ./cmd/airlock
-```
-
-## Test
-
-```bash
 go test ./...
 ```
 
-## Check host prerequisites
+## Documentation
 
-```bash
-./airlock check
-```
-
-## Probe a repo before running research
-
-```bash
-./airlock probe /path/to/repo-or-subdir
-./airlock investigate /path/to/repo-or-subdir
-./airlock plan /path/to/repo-or-subdir
-./airlock plan path/to/plan-input.json
-./airlock intake-compile path/to/plan-input.json
-./airlock intake-compile path/to/plan-input.json /tmp/issue-readonly.json
-./airlock synthesize path/to/plan-input.json
-./airlock synthesize path/to/plan-input.json /tmp/issue-autofix.json
-./airlock eval-planner path/to/cases.json
-./airlock fix https://github.com/owner/repo/issues/123
-./airlock preflight /path/to/repo-or-subdir
-```
-
-`plan-input.json` can include:
-- `repoPath`
-- `issueUrl`
-- `failingCommand`
-- `failureText`
-- `notes`
-
-`intake-compile` is the current bridge from issue intake to execution:
-- it compiles a local bug signal into a runnable **read-only** research contract
-- the generated artifact can go straight into `research-validate` or `research-run`
-- this removes the old need to hand-author a starting research contract in the common local-intake case
-
-`synthesize` is the first autonomy bridge for repair generation:
-- by default it uses built-in structured synthesis heuristics for supported bug classes
-- current validated heuristic classes now include:
-  - Python EOF/unclosed-block preservation
-  - Python empty-string optional-content guard tightening
-  - Go expected/got normalization mismatches
-- it can also use a planner-backed structured synthesis path when configured with:
-  - `AIRLOCK_PLANNER_PROVIDER=anthropic`
-  - `ANTHROPIC_API_KEY=...`
-  - optional: `AIRLOCK_PLANNER_MODEL=claude-sonnet-4-5`
-- planner-backed synthesis now uses improved file/context narrowing:
-  - failure/failing-command token scoring
-  - symbol extraction
-  - path scoring
-  - simple source/test pairing
-- planner-backed synthesis still returns bounded native Airlock mutation attempts, not arbitrary patch blobs
-- the output can go straight into `autofix-run`
-- current honest positioning remains: supported-class autonomous candidate-fix generation, not broad autonomous bug fixing yet
-
-Probe now distinguishes between:
-- `ready` — repo is runnable with no immediate structural warning
-- `structurally_blocked` — missing sources/bootstrap makes honest execution impossible
-- `monorepo_target_required` — repo root is too broad; choose a concrete package/module target
-- `host_toolchain_blocked_vm_runnable` — host execution should not proceed, but VM execution is still viable
-- `bootstrap_needed_vm_preferred` — bootstrap/install setup is likely needed before honest execution
-- `partial_runnable_scope` — a concrete subdir/package scope is selected and should stay scoped
-- `env_config_blocked` — execution context is still underspecified
-
-Host execution policy:
-- unknown repo code should not execute on the host by default
-- `airlock attempt-run ...` and `airlock autofix-run ...` will route to a VM when possible unless an explicit host exception is declared
-- declare an explicit host exception only with:
-  - `AIRLOCK_ALLOW_HOST_EXEC_EXCEPTION=1`
-
-When a repo falls into `host_toolchain_blocked_vm_runnable`, Airlock will prefer a VM-backed path instead of trying to validate on the host.
-Currently this auto-routing applies to:
-- `airlock attempt-run ...`
-- `airlock autofix-run ...`
-
-## Print contract templates
-
-```bash
-./airlock template research
-./airlock template campaign
-./airlock template attempt
-./airlock template autofix
-```
-
-## Run a native git-centric attempt locally
-
-```bash
-./airlock attempt-run path/to/attempt.json
-```
-
-## Run a bounded multi-attempt autofix loop
-
-```bash
-./airlock autofix-run path/to/autofix.json
-```
-
-## Run planner evals
-
-```bash
-./airlock eval-planner path/to/cases.json
-./airlock eval-planner path/to/cases.json /tmp/planner-eval-summary.json
-```
-
-`eval-planner` is the first machine-readable planner quality harness.
-It measures things like:
-- supported-case rate
-- schema-valid attempt rate
-- top-1 / top-3 mutation-kind hits when expectations are provided
-- optional local autofix execution on trusted/local eval fixtures
-
-Run-level metrics:
-```bash
-./airlock metrics
-./airlock metrics /path/to/runs.jsonl
-```
-
-Current metrics ledger and scorecards include:
-- credible advancement rate
-- verified issue resolution rate
-- repo / customer / global aggregation from append-only `runs.jsonl`
-
-## Run the top-level issue flow
-
-```bash
-./airlock fix https://github.com/owner/repo/issues/123
-```
-
-Current `fix` behavior:
-- resolves a public GitHub issue
-- clones the repo locally for inspection/planning
-- infers a failing command when possible from the issue body
-- compiles bounded issue-provided repro scaffolding for readonly runs when the issue body includes a temporary repro file snippet
-- performs a read-only VM reproduction run when a command is available
-- records truthful reproduction state (`reproduced`, `not_reproduced`, `infra_failure`, `bootstrap_failure`, `env_blocked`)
-- synthesizes candidate fixes
-- runs a bounded multi-round fix loop
-- suppresses duplicate attempts across rounds
-- carries prior-round failure memory into later synthesis rounds
-- avoids previously failed mutation kinds when alternative strategy families exist
-- promotes winning attempts explicitly via a recorded promoted checkpoint
-- emits `review-packet.md` and `draft-pr.md` artifacts for reviewer-facing output
-- can optionally publish a GitHub draft PR and post the PR link back to the issue when explicitly enabled via `AIRLOCK_GITHUB_CREATE_DRAFT_PR=1` and `GITHUB_TOKEN`
-- prints visible progress and a final JSON result artifact
-
-Autofix/attempt mutations can now use:
-- `search_replace`
-- `insert_after`
-- `replace_line`
-- `create_file`
-- `apply_patch`
-- `ensure_line`
-- `nil_guard`
-- `error_return`
-
-Planning/attempt ordering can now use:
-- repo-type defaults
-- failure-text-derived fingerprint hints
-- prior lessons plus optional `fingerprint_hints`
-
-Set `AIRLOCK_LESSONS_ROOT=/path/to/lessons` to feed a broader lesson corpus into planning.
-
-## Example run
-
-```bash
-./airlock run examples/lima-contract.json
-```
-
-## Research flows
-
-```bash
-./airlock research-validate examples/beats-kafka-alias-research.json
-./airlock research-run examples/beats-kafka-alias-research.json
-./airlock intake-compile path/to/plan-input.json /tmp/issue-readonly.json
-./airlock research-validate /tmp/issue-readonly.json
-./airlock research-run /tmp/issue-readonly.json
-./airlock campaign-validate examples/beats-kafka-alias-campaign.json
-./airlock campaign-run examples/beats-kafka-alias-campaign.json
-./airlock campaign-validate examples/beats-three-issue-campaign.json
-./airlock campaign-run examples/beats-three-issue-campaign.json
-```
-
-Recent product/backlog progress reflected in the current tree:
-- `AIR-005` validated: concrete package scope detection now classifies Python subdirs correctly
-- `AIR-007` validated: bug intake now compiles into runnable read-only research contracts
-- `AIR-008` validated: `research-validate` no longer fabricates bogus compiled plans against the control repo
-
-See `docs/contract.md`, `docs/autoresearch-protocol.md`, `docs/product-issues.md`, and `examples/`.
+- `docs/autoresearch-protocol.md` — autoresearch and fix loop protocol
+- `docs/backends.md` — Lima and Firecracker backend details
+- `docs/contract.md` — research contract schema
+- `docs/product-issues.md` — issue backlog
+- `docs/next-phase-gaps.md` — roadmap and gap tracker
+- `docs/security-model.md` — security model
+- `docs/firecracker-host-shim.md` — Firecracker host shim contract
+- `docs/firecracker-host-setup.md` — Linux bring-up guide

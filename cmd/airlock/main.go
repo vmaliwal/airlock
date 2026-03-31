@@ -149,7 +149,41 @@ func main() {
 }
 
 func usage() {
-	fmt.Println("usage: airlock <check|probe|investigate|plan|intake-compile|synthesize|eval-planner|fix|metrics|preflight|template|attempt-run|autofix-run|validate|run|research-validate|research-run|campaign-validate|campaign-run> [contract.json]")
+	fmt.Print(`airlock — autonomous bug fixing inside disposable VMs
+
+Primary command:
+  airlock fix <github-issue-url>     resolve → reproduce → synthesize → fix → PR
+
+Inspection (read-only, no side effects):
+  airlock probe <repo>               classify repo type and runability
+  airlock investigate <repo>         full investigation report
+  airlock plan <repo|input.json>     repair strategy without execution
+  airlock preflight <repo>           routing decision (host vs VM)
+  airlock metrics [runs.jsonl]       view run ledger and scorecards
+  airlock check                      check backend prerequisites
+
+Advanced / escape-hatch (for debugging Airlock itself):
+  airlock synthesize <input.json>    generate candidate fix attempts
+  airlock eval-planner <cases.json>  run planner eval corpus
+  airlock intake-compile <input>     compile issue intake to research contract
+  airlock attempt-run <attempt.json> run a single bounded attempt
+  airlock autofix-run <plan.json>    run a prepared multi-attempt autofix plan
+  airlock research-run <contract>    run a full research contract in VM
+  airlock research-validate <c>      validate a research contract (no exec)
+  airlock campaign-run <plan>        run a multi-issue campaign
+  airlock campaign-validate <plan>   validate a campaign plan (no exec)
+  airlock run <contract.json>        run a raw VM contract
+  airlock validate <contract.json>   validate a raw VM contract (no exec)
+  airlock template <type>            print a contract template
+
+Environment:
+  GITHUB_TOKEN                       GitHub auth (required for private repos and PR publishing)
+  AIRLOCK_GITHUB_CREATE_DRAFT_PR=1   enable automatic draft PR creation after successful fix
+  AIRLOCK_PLANNER_PROVIDER=anthropic enable LLM-backed synthesis
+  ANTHROPIC_API_KEY                  API key for planner
+  AIRLOCK_ALLOW_HOST_EXEC_EXCEPTION=1 allow host execution of repo code (use sparingly)
+  AIRLOCK_METRICS_DIR                custom path for runs.jsonl ledger
+`)
 }
 
 func runCheck() {
@@ -447,6 +481,10 @@ func runFix(issueURL string) {
 		}
 		plan := *synth.AutofixPlan
 		plan.ArtifactsDir = filepath.Join(plan.ArtifactsDir, "fix-loop")
+		// Enrich the plan with issue-level context so the VM contract compiler
+		// uses the canonical clone URL instead of re-reading a potentially
+		// symlink-affected macOS temp path.
+		plan = research.AutofixPlanFromIssue(plan, issue, synth.Investigation.Profile.RepoType)
 		return &plan, nil
 	}, func(round int, plan research.AutofixPlan) (string, error) {
 		progress("Attempt execution", fmt.Sprintf("round %d running %d attempts", round, len(plan.Attempts)), false, "")
