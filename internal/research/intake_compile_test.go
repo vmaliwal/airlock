@@ -44,6 +44,66 @@ func TestCompilePlanInputToRunContractGoPrefixesToolchainBootstrap(t *testing.T)
 	}
 }
 
+func TestNodeInstallCommandPriority(t *testing.T) {
+	cases := []struct{ files []string; want string }{
+		{[]string{"pnpm-lock.yaml", "package.json"}, "pnpm"},
+		{[]string{"yarn.lock", "package.json"}, "yarn"},
+		{[]string{"package-lock.json", "package.json"}, "npm ci"},
+		{[]string{"package.json"}, "npm install"},
+	}
+	for _, tc := range cases {
+		got := nodeInstallCommand(tc.files)
+		if got == "" || !containsText(got, tc.want) {
+			t.Fatalf("nodeInstallCommand(%v): want substring %q, got %q", tc.files, tc.want, got)
+		}
+	}
+}
+
+func TestCompilePlanInputToRunContractNodeBootstrap(t *testing.T) {
+	repo := t.TempDir()
+	if err := InitTempGitRepo(repo, map[string]string{
+		"package.json":      "{\"name\":\"vite\",\"scripts\":{\"test\":\"vitest run\"}}",
+		"pnpm-lock.yaml":    "lockfileVersion: '6.0'\n",
+		"src/index.ts":      "export const x = 1;\n",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := util.RunLocal("git", []string{"remote", "add", "origin", "https://github.com/vitejs/vite.git"}, util.RunOptions{Cwd: repo}); err != nil {
+		t.Fatal(err)
+	}
+	input := PlanInput{
+		RepoPath:       repo,
+		IssueURL:       "https://github.com/vitejs/vite/issues/19975",
+		FailingCommand: "pnpm test",
+		FailureText:    "module runner full reload error",
+	}
+	rc, err := CompilePlanInputToRunContract(input, "lima", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rc.Mode != "read_only" {
+		t.Fatalf("expected read_only mode, got %q", rc.Mode)
+	}
+	if len(rc.Setup) == 0 {
+		t.Fatal("expected bootstrap setup step for node repo")
+	}
+	found := false
+	for _, step := range rc.Setup {
+		if step.Name == "bootstrap node dependencies" {
+			found = true
+			if !containsText(step.Command, "pnpm") {
+				t.Fatalf("expected pnpm install in node bootstrap command, got %q", step.Command)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected 'bootstrap node dependencies' setup step, got %#v", rc.Setup)
+	}
+	if !contains(rc.Airlock.Security.AllowHosts, "registry.npmjs.org") {
+		t.Fatalf("expected registry.npmjs.org in allow hosts for node repo, got %#v", rc.Airlock.Security.AllowHosts)
+	}
+}
+
 func TestCompilePlanInputToRunContractPythonSubdir(t *testing.T) {
 	repo := t.TempDir()
 	if err := InitTempGitRepo(repo, map[string]string{

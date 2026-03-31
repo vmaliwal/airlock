@@ -129,15 +129,28 @@ func applyRuntimeBootstrapPolicy(profile RepoProfile, cmd string) string {
 		return cmd
 	case "go":
 		return applyBootstrapPrefix(cmd, goToolchainBootstrapCommand(profile))
+	case "node":
+		// No command rewriting needed for node — install is handled by the
+		// dedicated bootstrap setup step. Commands like npm test / pnpm test /
+		// node repro.js run as-is after the bootstrap step succeeds.
+		return cmd
 	default:
 		return cmd
 	}
 }
 
 func defaultBootstrapSetup(profile RepoProfile) []SetupStep {
-	if profile.RepoType != "python" {
+	switch profile.RepoType {
+	case "python":
+		return pythonBootstrapSetup(profile)
+	case "node":
+		return nodeBootstrapSetup(profile)
+	default:
 		return nil
 	}
+}
+
+func pythonBootstrapSetup(profile RepoProfile) []SetupStep {
 	commands := []string{"python3 -m venv .venv", ".venv/bin/python -m pip install -q --upgrade pip"}
 	switch {
 	case contains(profile.DetectedFiles, "requirements.txt"):
@@ -149,6 +162,31 @@ func defaultBootstrapSetup(profile RepoProfile) []SetupStep {
 		Name:    "bootstrap python venv",
 		Command: strings.Join(commands, " && "),
 	}}
+}
+
+func nodeBootstrapSetup(profile RepoProfile) []SetupStep {
+	cmd := nodeInstallCommand(profile.DetectedFiles)
+	if cmd == "" {
+		return nil
+	}
+	return []SetupStep{{
+		Name:    "bootstrap node dependencies",
+		Command: cmd,
+	}}
+}
+
+func nodeInstallCommand(detectedFiles []string) string {
+	switch {
+	case contains(detectedFiles, "pnpm-lock.yaml"):
+		return "npm install -g pnpm --silent && pnpm install --frozen-lockfile"
+	case contains(detectedFiles, "yarn.lock"):
+		return "yarn install --frozen-lockfile"
+	case contains(detectedFiles, "package-lock.json"):
+		return "npm ci --silent"
+	default:
+		// no lockfile — use npm install but don't freeze
+		return "npm install --silent"
+	}
 }
 
 func compiledNamePrefix(input PlanInput, profile RepoProfile) string {
@@ -190,7 +228,9 @@ func networkAllowHostsFor(repoType string) []string {
 	case "go":
 		return []string{"github.com", "go.dev", "dl.google.com", "proxy.golang.org", "sum.golang.org"}
 	case "node":
-		return []string{"registry.npmjs.org"}
+		// npm, pnpm, and yarn all resolve from registry.npmjs.org by default.
+		// registry.yarnpkg.com is an alias; include it for older yarn configs.
+		return []string{"registry.npmjs.org", "registry.yarnpkg.com"}
 	default:
 		return []string{"github.com"}
 	}

@@ -41,7 +41,12 @@ fi
 
 if command -v go >/dev/null 2>&1; then
   echo "release binary unavailable; falling back to go install" >&2
-  GOBIN="$INSTALL_DIR" go install github.com/vmaliwal/airlock/cmd/airlock@latest
+  # Inject the version tag at link time so 'airlock metrics' shows the real version.
+  ldflags=""
+  if [[ -n "${version:-}" ]]; then
+    ldflags="-ldflags=-X github.com/vmaliwal/airlock/internal/research.BuildVersion=${version}"
+  fi
+  GOBIN="$INSTALL_DIR" go install ${ldflags:+"$ldflags"} github.com/vmaliwal/airlock/cmd/airlock@latest
   echo "installed $BIN_NAME to $INSTALL_DIR/$BIN_NAME"
   exit 0
 fi

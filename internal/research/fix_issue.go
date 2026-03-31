@@ -147,23 +147,105 @@ func BuildPlanInputFromIssue(issue GitHubIssue, repoPath string) PlanInput {
 	}
 }
 
+// inferFailingCommandFromIssue extracts the most likely reproduction command
+// from an issue body. It tries bare-line patterns first (high confidence),
+// then falls back to fenced-shell-block extraction (lower confidence).
 func inferFailingCommandFromIssue(issue GitHubIssue) string {
 	body := issue.Body
-	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`(?m)^(go test\s+.+)$`),
-		regexp.MustCompile(`(?m)^(pytest\s+.+)$`),
-		regexp.MustCompile(`(?m)^(python\s+-m\s+pytest\s+.+)$`),
-		regexp.MustCompile(`(?m)^(npm test(?:\s+--\s+.+)?)$`),
-		regexp.MustCompile(`(?m)^(pnpm test(?:\s+.+)?)$`),
-		regexp.MustCompile(`(?m)^(yarn test(?:\s+.+)?)$`),
-		regexp.MustCompile(`(?m)^(cargo test\s+.+)$`),
+	if cmd := inferBareLineCommand(body); cmd != "" {
+		return cmd
 	}
-	for _, re := range patterns {
-		if m := re.FindStringSubmatch(body); len(m) > 1 {
-			return strings.TrimSpace(m[1])
+	return inferFencedBlockCommand(body)
+}
+
+// bareLinePatterns are matched against individual lines with no surrounding
+// context required. Order matters — more specific patterns first.
+var bareLinePatterns = []*regexp.Regexp{
+	// Go
+	regexp.MustCompile(`^(go test\s+\S.*)$`),
+	// Python
+	regexp.MustCompile(`^(python\s+-m\s+pytest\s+\S.*)$`),
+	regexp.MustCompile(`^(pytest\s+\S.*)$`),
+	regexp.MustCompile(`^(pytest)$`),
+	regexp.MustCompile(`^(\.venv/bin/python\s+\S.*)$`),
+	// uv / modern Python tooling
+	regexp.MustCompile(`^(uv run\s+\S.*)$`),
+	// Rust
+	regexp.MustCompile(`^(cargo test\s+\S.*)$`),
+	regexp.MustCompile(`^(cargo test)$`),
+	// Node (npm / pnpm / yarn)
+	regexp.MustCompile(`^(npm test(?:\s+--\s+.*)?)$`),
+	regexp.MustCompile(`^(npm run test(?:\s+\S.*)?)$`),
+	regexp.MustCompile(`^(pnpm test(?:\s+\S.*)?)$`),
+	regexp.MustCompile(`^(pnpm run test(?:\s+\S.*)?)$`),
+	regexp.MustCompile(`^(yarn test(?:\s+\S.*)?)$`),
+	regexp.MustCompile(`^(yarn run test(?:\s+\S.*)?)$`),
+	// Node script runner
+	regexp.MustCompile(`^(node\s+\S+\.(?:js|mjs|cjs|ts).*)$`),
+	// Task runners
+	regexp.MustCompile(`^(just\s+\S.*)$`),
+	regexp.MustCompile(`^(make\s+(?:test|check|spec)\S*.*)$`),
+	regexp.MustCompile(`^(make\s+test)$`),
+}
+
+func inferBareLineCommand(body string) string {
+	for _, line := range strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n") {
+		// Strip shell prompt prefixes common in issue bodies
+		line = strings.TrimSpace(line)
+		line = strings.TrimPrefix(line, "$ ")
+		line = strings.TrimPrefix(line, "% ")
+		line = strings.TrimPrefix(line, "> ")
+		line = strings.TrimSpace(line)
+		for _, re := range bareLinePatterns {
+			if m := re.FindStringSubmatch(line); len(m) > 1 {
+				return strings.TrimSpace(m[1])
+			}
 		}
 	}
 	return ""
+}
+
+// fencedBlockCommandRE matches ``` ... ``` blocks including language specifiers.
+var fencedBlockCommandRE = regexp.MustCompile("(?s)```(?:sh|bash|shell|console|zsh|fish|text|)?\n(.*?)```")
+
+// reproKeywords are used to score fenced blocks for repro likelihood.
+var reproKeywords = []string{"repro", "test", "spec", "fail", "example", "run", "error", "bug"}
+
+func inferFencedBlockCommand(body string) string {
+	type candidate struct {
+		cmd   string
+		score int
+	}
+	var best candidate
+	blocks := fencedBlockCommandRE.FindAllStringSubmatchIndex(body, -1)
+	for _, loc := range blocks {
+		block := body[loc[2]:loc[3]]
+		// Score the surrounding context (100 chars before block) for repro keywords
+		contextStart := loc[0] - 100
+		if contextStart < 0 {
+			contextStart = 0
+		}
+		context := strings.ToLower(body[contextStart:loc[0]])
+		score := 0
+		for _, kw := range reproKeywords {
+			if strings.Contains(context, kw) {
+				score++
+			}
+		}
+		// Also score the block content itself
+		blockLower := strings.ToLower(block)
+		for _, kw := range reproKeywords {
+			if strings.Contains(blockLower, kw) {
+				score++
+			}
+		}
+		// Extract the first matching command from this block
+		cmd := inferBareLineCommand(block)
+		if cmd != "" && score > best.score {
+			best = candidate{cmd: cmd, score: score}
+		}
+	}
+	return best.cmd
 }
 
 func ReadSiblingArtifact(summaryPath, suffix string) (map[string]any, bool) {
