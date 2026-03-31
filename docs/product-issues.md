@@ -569,7 +569,15 @@ Progress now shipped:
 - `airlock fix` also writes a first `draft-pr.md` artifact for GitHub-first reviewer output
 - these artifacts surface directly in `FixResult` as `reviewPacketPath` and `draftPRPath`
 
-This issue remains open because automated GitHub draft PR creation/posting is still not implemented.
+This issue remains open because automated GitHub draft PR creation/posting is still incomplete.
+
+Additional progress now shipped:
+- `airlock fix` can optionally attempt GitHub draft PR publication when explicitly enabled with `AIRLOCK_GITHUB_CREATE_DRAFT_PR=1`
+- publication is gated on current run evidence and requires `GITHUB_TOKEN`
+- the first implementation creates a branch from the promoted fix state, pushes it, and creates a draft PR via the GitHub API
+
+Remaining gap:
+- this path still needs live end-to-end validation on a safe target plus follow-up PR/comment polish
 
 ## AIR-014 — Private repo auth inside the guest is still missing
 - Status: `in_progress`

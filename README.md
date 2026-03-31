@@ -212,6 +212,7 @@ Current `fix` behavior:
 - avoids previously failed mutation kinds when alternative strategy families exist
 - promotes winning attempts explicitly via a recorded promoted checkpoint
 - emits `review-packet.md` and `draft-pr.md` artifacts for reviewer-facing output
+- can optionally publish a GitHub draft PR when explicitly enabled via `AIRLOCK_GITHUB_CREATE_DRAFT_PR=1` and `GITHUB_TOKEN`
 - prints visible progress and a final JSON result artifact
 
 Autofix/attempt mutations can now use:

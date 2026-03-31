@@ -368,6 +368,7 @@ func runFix(issueURL string) {
 		fail("clone_failed", err)
 	}
 	progress("Clone repo", repoPath, true, "")
+	baseBranch, _ := research.GitCurrentBranch(repoPath)
 	input := research.BuildPlanInputFromIssue(issue, repoPath)
 	backend := ""
 	if kind, err := selectAutoVMBackend(); err == nil {
@@ -559,6 +560,15 @@ func runFix(issueURL string) {
 		if draftPath, draftErr := research.WriteDraftPRArtifact(result, summary, proof); draftErr == nil {
 			result.DraftPRPath = draftPath
 			progress("Draft PR", "written", true, draftPath)
+		}
+	}
+	if research.GitHubDraftPRPublishingEnabled() && summary.CredibleAdvancement && result.DraftPRPath != "" {
+		progress("Publish draft PR", "creating GitHub draft PR", false, baseBranch)
+		if pub, pubErr := research.CreateDraftPRFromFix(result, baseBranch); pubErr == nil {
+			result.DraftPRPublication = &pub
+			progress("Publish draft PR", "created", true, pub.URL)
+		} else {
+			progress("Publish draft PR", "skipped", true, pubErr.Error())
 		}
 	}
 	appendSummary()
