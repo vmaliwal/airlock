@@ -45,3 +45,66 @@ func findFileLineContaining(root, needle string) (string, string, bool) {
 	})
 	return foundPath, foundLine, foundPath != ""
 }
+
+// findFileMultiLineContext finds a file that contains all needles and returns
+// a context window around the first needle match, plus the file path.
+func findFileMultiLineContext(root string, needles []string, contextLines int) (relPath, context string, found bool) {
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		content := string(data)
+		for _, needle := range needles {
+			if !strings.Contains(content, needle) {
+				return nil
+			}
+		}
+		lines := strings.Split(content, "\n")
+		// Find line index of first needle
+		firstIdx := -1
+		for i, line := range lines {
+			if strings.Contains(line, needles[0]) {
+				firstIdx = i
+				break
+			}
+		}
+		if firstIdx < 0 {
+			return nil
+		}
+		start := firstIdx - contextLines
+		if start < 0 {
+			start = 0
+		}
+		end := firstIdx + contextLines + 1
+		if end > len(lines) {
+			end = len(lines)
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+		relPath = filepath.ToSlash(rel)
+		context = strings.Join(lines[start:end], "\n")
+		found = true
+		return os.ErrExist
+	})
+	return relPath, context, found
+}
+
+var stopWords = map[string]bool{
+	"should": true, "returns": true, "return": true, "function": true,
+	"method": true, "field": true, "value": true, "error": true,
+	"expected": true, "actual": true, "instead": true, "missing": true,
+	"using": true, "issue": true, "cause": true, "because": true,
+}
+
+func commonStopWord(w string) bool {
+	return stopWords[strings.ToLower(w)]
+}

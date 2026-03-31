@@ -386,3 +386,44 @@ func hasIntegrationHints(files []string) bool {
 	}
 	return false
 }
+
+// IssueBodyServiceDependent returns true when the issue body describes a
+// runtime that requires a live service (HMR, dev server, websocket, etc.).
+// These issues are usually not amenable to bounded offline test reproduction.
+func IssueBodyServiceDependent(body string) bool {
+	lower := strings.ToLower(body)
+	signals := []string{
+		"dev server", "devserver", "hmr", "hot reload", "hot module",
+		"program reload", "full reload", "websocket", "ws://", "wss://",
+		"vite server", "webpack-dev-server", "live reload",
+		"open a browser", "open browser", "click", "manually reproduce",
+		"stackblitz", "codesandbox", "reproduction link", "repro link",
+		"start the server", "run the server", "docker run", "docker-compose up",
+	}
+	for _, s := range signals {
+		if strings.Contains(lower, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsSetupCommand returns true when a command looks like it is preparing the
+// environment rather than asserting failure (e.g. build/install commands that
+// precede the actual test assertion).
+func IsSetupCommand(cmd string) bool {
+	lower := strings.ToLower(strings.TrimSpace(cmd))
+	setupPrefixes := []string{
+		"maturin develop", "maturin build",
+		"pip install", "uv pip install", "npm install", "pnpm install", "yarn install",
+		"go build", "cargo build",
+		"make build", "make install",
+		"docker build", "docker-compose build",
+	}
+	for _, prefix := range setupPrefixes {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	return false
+}

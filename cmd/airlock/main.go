@@ -370,6 +370,13 @@ func runFix(issueURL string) {
 	progress("Clone repo", repoPath, true, "")
 	baseBranch, _ := research.GitCurrentBranch(repoPath)
 	input := research.BuildPlanInputFromIssue(issue, repoPath)
+	issueSignals := research.ClassifyIssueSignals(issue, input.FailingCommand)
+	if issueSignals.ServiceDependent {
+		progress("Issue signals", "service-dependent", true, issueSignals.Notes)
+	}
+	if issueSignals.InferredCommandKind == "setup" {
+		progress("Issue signals", "command looks like setup not repro", true, input.FailingCommand)
+	}
 	backend := ""
 	if kind, err := selectAutoVMBackend(); err == nil {
 		backend = string(kind)
@@ -379,7 +386,7 @@ func runFix(issueURL string) {
 	if sha, err := research.GitHeadSHA(repoPath); err == nil {
 		summary.RepoSHA = sha
 	}
-	result := research.FixResult{Issue: issue, RepoPath: repoPath, PlanInput: input}
+	result := research.FixResult{Issue: issue, RepoPath: repoPath, PlanInput: input, IssueSignals: issueSignals}
 	proof := research.ProofState{ReproStatus: research.ReproStatusNotReproduced, ValidationScope: "target_only", FixConfidence: "none"}
 	if input.FailingCommand != "" {
 		progress("Reproduce bug", input.FailingCommand, false, "readonly VM run")

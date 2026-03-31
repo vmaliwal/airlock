@@ -34,18 +34,51 @@ type FixProgressEvent struct {
 }
 
 type FixResult struct {
-	Issue                  GitHubIssue        `json:"issue"`
-	RepoPath               string             `json:"repoPath"`
-	PlanInput              PlanInput          `json:"planInput"`
-	ReadonlySummaryPath    string             `json:"readonlySummaryPath,omitempty"`
-	ReproductionResults    map[string]any     `json:"reproductionResults,omitempty"`
-	Synthesis              SynthesisReport    `json:"synthesis"`
-	AutofixContractSummary string             `json:"autofixContractSummary,omitempty"`
-	AutofixResult          map[string]any     `json:"autofixResult,omitempty"`
-	FixLoop                AutofixLoopSummary `json:"fixLoop,omitempty"`
-	ReviewPacketPath       string             `json:"reviewPacketPath,omitempty"`
-	DraftPRPath            string             `json:"draftPRPath,omitempty"`
+	Issue                  GitHubIssue         `json:"issue"`
+	RepoPath               string              `json:"repoPath"`
+	PlanInput              PlanInput           `json:"planInput"`
+	IssueSignals           IssueSignals        `json:"issueSignals,omitempty"`
+	ReadonlySummaryPath    string              `json:"readonlySummaryPath,omitempty"`
+	ReproductionResults    map[string]any      `json:"reproductionResults,omitempty"`
+	Synthesis              SynthesisReport     `json:"synthesis"`
+	AutofixContractSummary string              `json:"autofixContractSummary,omitempty"`
+	AutofixResult          map[string]any      `json:"autofixResult,omitempty"`
+	FixLoop                AutofixLoopSummary  `json:"fixLoop,omitempty"`
+	ReviewPacketPath       string              `json:"reviewPacketPath,omitempty"`
+	DraftPRPath            string              `json:"draftPRPath,omitempty"`
 	DraftPRPublication     *DraftPRPublication `json:"draftPRPublication,omitempty"`
+}
+
+// IssueSignals captures lightweight classification signals derived from the
+// issue body before any execution occurs. Used for honest early classification.
+type IssueSignals struct {
+	ServiceDependent    bool   `json:"service_dependent,omitempty"`
+	InferredCommandKind string `json:"inferred_command_kind,omitempty"` // "repro", "setup", "none"
+	Notes               string `json:"notes,omitempty"`
+}
+
+// ClassifyIssueSignals derives signals from an issue body and inferred command
+// without cloning or executing anything.
+func ClassifyIssueSignals(issue GitHubIssue, inferredCmd string) IssueSignals {
+	sig := IssueSignals{}
+	if IssueBodyServiceDependent(issue.Body) {
+		sig.ServiceDependent = true
+		sig.Notes = "issue body describes a live-service reproduction (HMR, dev server, browser interaction); offline test reproduction may not be possible"
+	}
+	switch {
+	case inferredCmd == "":
+		sig.InferredCommandKind = "none"
+	case IsSetupCommand(inferredCmd):
+		sig.InferredCommandKind = "setup"
+		if sig.Notes == "" {
+			sig.Notes = "inferred command looks like a setup/build step, not a test assertion; reproduction may be incomplete"
+		} else {
+			sig.Notes += "; inferred command looks like a setup/build step"
+		}
+	default:
+		sig.InferredCommandKind = "repro"
+	}
+	return sig
 }
 
 func ResolveGitHubIssue(issueURL string) (GitHubIssue, error) {
